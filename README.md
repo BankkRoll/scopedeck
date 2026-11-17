@@ -28,20 +28,34 @@ earnings, and search Hacktivity, all from one window.
 - **Hacktivity.** A query builder that compiles to the API's Lucene syntax, a raw query mode,
   saved searches and infinite scroll.
 - **Earnings.** Balance, monthly totals, per-program breakdown and CSV export.
+- **One toolbar everywhere.** Every page has search, sort, a filter sheet with live result
+  counts, removable filter chips, and a card or list layout. Your choices are remembered per page.
 - **Keyboard first.** <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd> palette, `g`-sequences for
-  navigation, `j`/`k` in every table. Press <kbd>?</kbd> for the full list.
+  navigation, `j`/`k` in every table, <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>B</kbd> to collapse the
+  sidebar. Press <kbd>?</kbd> for the full list.
 
 Anything the API does not cover, such as replying to a report or changing account settings,
 opens the right page on hackerone.com. [docs/api-coverage.md](docs/api-coverage.md) lists what
 is implemented and what is linked out.
 
-| Composer                                   | Report                                 |
-| ------------------------------------------ | -------------------------------------- |
-| ![Composer](docs/screenshots/composer.png) | ![Report](docs/screenshots/report.png) |
+| Filters                                  | List view, collapsed sidebar                     |
+| ---------------------------------------- | ------------------------------------------------ |
+| ![Filters](docs/screenshots/filters.png) | ![List view](docs/screenshots/programs-list.png) |
+
+| Program                                  | Composer                                   |
+| ---------------------------------------- | ------------------------------------------ |
+| ![Program](docs/screenshots/program.png) | ![Composer](docs/screenshots/composer.png) |
+
+| Reports                                  | Report                                 |
+| ---------------------------------------- | -------------------------------------- |
+| ![Reports](docs/screenshots/reports.png) | ![Report](docs/screenshots/report.png) |
 
 | Hacktivity                                     | Earnings                                   |
 | ---------------------------------------------- | ------------------------------------------ |
 | ![Hacktivity](docs/screenshots/hacktivity.png) | ![Earnings](docs/screenshots/earnings.png) |
+
+Screenshots use the public program list and made-up demo data, so they show no real account's
+reports or earnings.
 
 ## Install
 

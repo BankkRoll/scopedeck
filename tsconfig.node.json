@@ -8,6 +8,7 @@
     "moduleDetection": "force",
     "types": ["node"],
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "strict": true,
