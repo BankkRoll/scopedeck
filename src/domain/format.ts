@@ -63,3 +63,33 @@ export function humanize(value: string | null | undefined): string {
   const spaced = value.replace(/[-_]+/g, " ").trim();
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
+
+const ASSET_TYPE_LABELS: Record<string, string> = {
+  URL: "URL",
+  WILDCARD: "Wildcard",
+  API: "API",
+  CIDR: "CIDR",
+  IP_ADDRESS: "IP address",
+  DOMAIN: "Domain",
+  GOOGLE_PLAY_APP_ID: "Android app",
+  APPLE_STORE_APP_ID: "iOS app",
+  OTHER_APK: "Android APK",
+  OTHER_IPA: "iOS IPA",
+  TESTFLIGHT: "TestFlight",
+  WINDOWS_APP_STORE_APP_ID: "Windows app",
+  DOWNLOADABLE_EXECUTABLES: "Executable",
+  SOURCE_CODE: "Source code",
+  SMART_CONTRACT: "Smart contract",
+  HARDWARE: "Hardware",
+  AI_MODEL: "AI model",
+  OTHER: "Other",
+};
+
+/**
+ * Display name for an API asset type such as `GOOGLE_PLAY_APP_ID`.
+ *
+ * @example assetTypeLabel("WILDCARD") // "Wildcard"
+ */
+export function assetTypeLabel(assetType: string): string {
+  return ASSET_TYPE_LABELS[assetType.toUpperCase()] ?? humanize(assetType.toLowerCase());
+}

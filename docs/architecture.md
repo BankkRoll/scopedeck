@@ -34,7 +34,8 @@ leak or misuse anything if a sanitizer bug ever lets script through.
 - **External links.** `open_external` accepts only `https` URLs on `hackerone.com`,
   `docs.hackerone.com` and `api.hackerone.com`.
 - **CSP.** `default-src 'self'`, no remote scripts and `connect-src` limited to Tauri IPC.
-  `style-src` allows inline styles because CodeMirror injects them at runtime.
+  `style-src` allows inline styles because CodeMirror injects them at runtime. `img-src` allows
+  only HackerOne's profile-photo CDN, for program logos; Markdown images stay stripped.
 
 ## Rust core
 

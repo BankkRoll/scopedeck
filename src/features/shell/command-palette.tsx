@@ -4,6 +4,8 @@ import { Command } from "cmdk";
 import { Dialog as RadixDialog } from "radix-ui";
 import { useDeferredValue, useState } from "react";
 import { localSearch } from "@/ipc/programs";
+import { ProgramAvatar } from "@/components/program-avatar";
+import { useProgramLookup } from "@/features/programs/use-programs";
 import { reportsCached } from "@/ipc/reports";
 import { draftsList } from "@/ipc/workspace";
 import { openOnHackerOne } from "@/lib/open-external";
@@ -25,6 +27,7 @@ const groupClass =
 
 export function CommandPalette({ open, onOpenChange, onShowShortcuts, username }: PaletteProps) {
   const navigate = useNavigate();
+  const lookup = useProgramLookup();
   const [search, setSearch] = useState("");
   const deferred = useDeferredValue(search.trim());
   const hits = useQuery({
@@ -84,9 +87,25 @@ export function CommandPalette({ open, onOpenChange, onShowShortcuts, username }
                         });
                       }}
                     >
-                      <span className="truncate text-ink">{hit.title}</span>
+                      {hit.kind === "program" ? (
+                        <ProgramAvatar
+                          name={hit.title}
+                          src={lookup.get(hit.program ?? hit.reference)?.profilePicture}
+                          size="xs"
+                        />
+                      ) : (
+                        <ProgramAvatar
+                          name={lookup.get(hit.program ?? "")?.name ?? hit.program ?? hit.title}
+                          src={lookup.get(hit.program ?? "")?.profilePicture}
+                          size="xs"
+                          className="opacity-70"
+                        />
+                      )}
+                      <span className="min-w-0 flex-1 truncate text-ink">{hit.title}</span>
                       <span className="shrink-0 text-faint">
-                        {hit.kind === "scope" ? hit.program : "Program"}
+                        {hit.kind === "scope"
+                          ? (lookup.get(hit.program ?? "")?.name ?? hit.program)
+                          : "Program"}
                       </span>
                     </Command.Item>
                   ))}

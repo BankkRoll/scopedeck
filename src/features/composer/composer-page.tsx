@@ -10,7 +10,10 @@ import { MarkdownEditor } from "@/components/markdown-editor";
 import { ErrorNotice, PageHeader } from "@/components/status";
 import { Kbd } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Field, Select } from "@/components/ui/field";
+import { ProgramAvatar } from "@/components/program-avatar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { Field } from "@/components/ui/field";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   TITLE_LIMIT,
@@ -20,7 +23,7 @@ import {
   validateDraft,
   type ComposerField,
 } from "@/domain/composer-validation";
-import { formatBytes, formatRelative, humanize } from "@/domain/format";
+import { assetTypeLabel, formatBytes, formatRelative, humanize } from "@/domain/format";
 import { intentDescription } from "@/domain/intent-description";
 import { groupByAssetType, submittableScopes } from "@/domain/scope-eligibility";
 import { cn } from "@/lib/cn";
@@ -34,6 +37,14 @@ import { TemplatesDialog } from "./templates-dialog";
 import { useDraft, type SaveState } from "./use-draft";
 
 const SEVERITIES: SeverityRating[] = ["none", "low", "medium", "high", "critical"];
+
+const SEVERITY_DOT: Record<SeverityRating, string> = {
+  none: "bg-sev-none",
+  low: "bg-sev-low",
+  medium: "bg-sev-medium",
+  high: "bg-sev-high",
+  critical: "bg-sev-critical",
+};
 
 function SaveIndicator({ state }: { state: SaveState }) {
   if (state.kind === "saving") return <span>Saving</span>;
@@ -125,14 +136,43 @@ function Composer({ draftId, initialProgram, onCreated }: ComposerProps) {
   const problemFor = (field: ComposerField) =>
     attempted ? problems.find((problem) => problem.field === field)?.message : undefined;
 
-  const programOptions = useMemo(
+  const programOptions = useMemo<ComboboxOption[]>(
     () =>
       (programs.data ?? [])
         .filter((row) => row.submissionState === "open" || row.handle === content.programHandle)
-        .toSorted((a, b) => Number(b.pinned) - Number(a.pinned) || a.name.localeCompare(b.name)),
+        .toSorted((a, b) => Number(b.pinned) - Number(a.pinned) || a.name.localeCompare(b.name))
+        .map((row) => ({
+          value: row.handle,
+          label: row.name,
+          detail: row.handle,
+          group: row.pinned ? "Pinned" : "Programs",
+          icon: <ProgramAvatar name={row.name} src={row.profilePicture} size="xs" />,
+        })),
     [programs.data, content.programHandle],
   );
-  const assetGroups = useMemo(() => groupByAssetType(submittableScopes(detail?.scopes ?? [])), [detail]);
+  const assetOptions = useMemo<ComboboxOption[]>(
+    () =>
+      groupByAssetType(submittableScopes(detail?.scopes ?? [])).flatMap((group) =>
+        group.scopes.map((scope) => ({
+          value: scope.id,
+          label: scope.assetIdentifier,
+          group: assetTypeLabel(group.assetType),
+          detail: scope.eligibleForBounty ? undefined : "No bounty",
+        })),
+      ),
+    [detail],
+  );
+  const weaknessOptions = useMemo<ComboboxOption[]>(
+    () =>
+      (detail?.weaknesses ?? [])
+        .toSorted((a, b) => a.name.localeCompare(b.name))
+        .map((weakness) => ({
+          value: weakness.id,
+          label: weakness.name,
+          detail: weakness.externalId?.toUpperCase(),
+        })),
+    [detail],
+  );
 
   const review = useCallback(async () => {
     setAttempted(true);
@@ -234,33 +274,29 @@ function Composer({ draftId, initialProgram, onCreated }: ComposerProps) {
         }
       />
       {draft.loadError ? <ErrorNotice error={draft.loadError} className="mx-5 mt-3" /> : null}
-      <div className="grid min-h-0 flex-1 grid-cols-[340px_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 grid-cols-[360px_minmax(0,1fr)]">
         <aside
           className="flex min-h-0 flex-col gap-5 overflow-y-auto border-r border-line p-5"
           aria-label="Report details"
         >
           <Field label="Program" htmlFor={ids.program} error={problemFor("programHandle")}>
-            <Select
+            <Combobox
               id={ids.program}
-              value={content.programHandle ?? ""}
-              aria-invalid={Boolean(problemFor("programHandle"))}
-              onChange={(event) => {
+              value={content.programHandle}
+              invalid={Boolean(problemFor("programHandle"))}
+              placeholder="Choose a program"
+              searchPlaceholder="Search programs"
+              emptyText="No open programs match"
+              options={programOptions}
+              onChange={(programHandle) => {
                 update({
-                  programHandle: event.target.value || null,
+                  programHandle,
                   structuredScopeId: null,
                   weaknessId: null,
                   acknowledgedExclusions: [],
                 });
               }}
-            >
-              <option value="">Choose a program</option>
-              {programOptions.map((row) => (
-                <option key={row.handle} value={row.handle}>
-                  {row.pinned ? "★ " : ""}
-                  {row.name}
-                </option>
-              ))}
-            </Select>
+            />
           </Field>
 
           <Field
@@ -269,47 +305,33 @@ function Composer({ draftId, initialProgram, onCreated }: ComposerProps) {
             error={problemFor("structuredScopeId")}
             hint={detail ? `${submittableScopes(detail.scopes).length} assets accept submissions` : undefined}
           >
-            <Select
+            <Combobox
               id={ids.asset}
-              value={content.structuredScopeId ?? ""}
+              value={content.structuredScopeId}
               disabled={!detail}
-              onChange={(event) => {
-                update({ structuredScopeId: event.target.value || null });
+              placeholder={program.syncing && !detail ? "Loading scope" : "Choose a program first"}
+              noneLabel={detail ? "No specific asset" : undefined}
+              searchPlaceholder="Search assets"
+              options={assetOptions}
+              onChange={(structuredScopeId) => {
+                update({ structuredScopeId });
               }}
-            >
-              <option value="">
-                {detail ? "No specific asset" : program.syncing ? "Loading scope" : "Choose a program first"}
-              </option>
-              {assetGroups.map((group) => (
-                <optgroup key={group.assetType} label={humanize(group.assetType.toLowerCase())}>
-                  {group.scopes.map((scope) => (
-                    <option key={scope.id} value={scope.id}>
-                      {scope.assetIdentifier}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </Select>
+            />
           </Field>
 
           <Field label="Weakness" htmlFor={ids.weakness} error={problemFor("weaknessId")}>
-            <Select
+            <Combobox
               id={ids.weakness}
-              value={content.weaknessId ?? ""}
+              value={content.weaknessId}
               disabled={!detail}
-              onChange={(event) => {
-                update({ weaknessId: event.target.value || null });
+              placeholder="Choose a program first"
+              noneLabel={detail ? "No weakness selected" : undefined}
+              searchPlaceholder="Search by name or CWE"
+              options={weaknessOptions}
+              onChange={(weaknessId) => {
+                update({ weaknessId });
               }}
-            >
-              <option value="">No weakness selected</option>
-              {(detail?.weaknesses ?? [])
-                .toSorted((a, b) => a.name.localeCompare(b.name))
-                .map((weakness) => (
-                  <option key={weakness.id} value={weakness.id}>
-                    {weakness.name}
-                  </option>
-                ))}
-            </Select>
+            />
           </Field>
 
           <fieldset className="flex flex-col gap-1.5">
@@ -324,8 +346,9 @@ function Composer({ draftId, initialProgram, onCreated }: ComposerProps) {
                   onClick={() => {
                     update({ severityRating: content.severityRating === rating ? null : rating });
                   }}
-                  className="h-8 rounded-md border border-line text-[13px] text-muted hover:border-line-strong hover:text-ink aria-checked:border-ink aria-checked:bg-raised aria-checked:text-ink"
+                  className="inline-flex h-8 items-center justify-center gap-1 rounded-md border border-line px-1 text-[13px] text-muted transition-colors hover:border-line-strong hover:text-ink aria-checked:border-line-strong aria-checked:bg-raised aria-checked:text-ink"
                 >
+                  <span className={cn("size-1.5 shrink-0 rounded-full", SEVERITY_DOT[rating])} aria-hidden />
                   {humanize(rating)}
                 </button>
               ))}
@@ -377,18 +400,17 @@ function Composer({ draftId, initialProgram, onCreated }: ComposerProps) {
               {detail.exclusions.map((exclusion) => {
                 const checked = content.acknowledgedExclusions.includes(exclusion.id);
                 return (
-                  <label key={exclusion.id} className="flex items-start gap-2 text-[13px]">
-                    <input
-                      type="checkbox"
+                  <label key={exclusion.id} className="flex items-start gap-2.5 text-[13px]">
+                    <Checkbox
                       checked={checked}
-                      onChange={() => {
+                      onCheckedChange={(next) => {
                         update({
-                          acknowledgedExclusions: checked
-                            ? content.acknowledgedExclusions.filter((id) => id !== exclusion.id)
-                            : [...content.acknowledgedExclusions, exclusion.id],
+                          acknowledgedExclusions: next
+                            ? [...content.acknowledgedExclusions, exclusion.id]
+                            : content.acknowledgedExclusions.filter((id) => id !== exclusion.id),
                         });
                       }}
-                      className="mt-0.5 size-3.5 shrink-0 accent-[var(--accent)]"
+                      className="mt-0.5"
                     />
                     <span>
                       <span className="text-ink">{exclusion.category ?? "Uncategorised"}</span>

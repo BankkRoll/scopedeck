@@ -8,7 +8,9 @@ import { savedSearchDelete, savedSearchSave, savedSearchesList } from "@/ipc/wor
 import { openOnHackerOne } from "@/lib/open-external";
 import { EmptyState, ErrorNotice, PageHeader, SeverityLabel } from "@/components/status";
 import { Button } from "@/components/ui/button";
-import { Input, Select } from "@/components/ui/field";
+import { Input } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
+import { ProgramAvatar } from "@/components/program-avatar";
 import { hackerOne } from "@/domain/deep-links";
 import { formatDate, formatMoney, formatRelative, humanize } from "@/domain/format";
 import {
@@ -18,6 +20,7 @@ import {
   queryStringFor,
   type BuilderState,
 } from "@/domain/hacktivity-query";
+import { useProgramLookup } from "@/features/programs/use-programs";
 import { useViewAction } from "@/features/shell/view-actions";
 import { queryKeys } from "@/query/keys";
 import { QueryBuilder } from "./query-builder";
@@ -27,6 +30,8 @@ const ROW_HEIGHT = 76;
 
 function HacktivityRow({ item }: { item: HacktivityItem }) {
   const url = item.url ?? hackerOne.report(item.id);
+  const program = useProgramLookup().get(item.programHandle ?? "");
+  const programName = program?.name ?? item.programName ?? item.programHandle;
   return (
     <button
       type="button"
@@ -44,9 +49,14 @@ function HacktivityRow({ item }: { item: HacktivityItem }) {
       </div>
       <div className="flex w-full items-center gap-3 text-[13px] text-faint">
         <span className="w-24 shrink-0 font-mono">#{item.id}</span>
+        {programName ? (
+          <span className="inline-flex shrink-0 items-center gap-1.5 text-muted">
+            <ProgramAvatar name={programName} src={program?.profilePicture} size="xs" />
+            {programName}
+          </span>
+        ) : null}
         <span className="truncate">
           {[
-            item.programName ?? item.programHandle,
             item.reporterUsername ? `by ${item.reporterUsername}` : null,
             item.cwe,
             item.cveIds.join(", ") || null,
@@ -99,19 +109,15 @@ function SavedSearches({
         aria-label="Saved searches"
         className="w-52"
         value={selected}
-        onChange={(event) => {
-          setSelected(event.target.value);
-          const match = valid.find((search) => search.id === event.target.value);
+        placeholder={valid.length ? `Saved searches (${valid.length})` : "No saved searches"}
+        disabled={valid.length === 0}
+        onValueChange={(id) => {
+          setSelected(id);
+          const match = valid.find((search) => search.id === id);
           if (match) onLoad(match.state);
         }}
-      >
-        <option value="">Saved searches ({valid.length})</option>
-        {valid.map((search) => (
-          <option key={search.id} value={search.id}>
-            {search.name}
-          </option>
-        ))}
-      </Select>
+        options={valid.map((search) => ({ value: search.id, label: search.name }))}
+      />
       {selectedSearch ? (
         <Button
           size="icon"

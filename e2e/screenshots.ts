@@ -6,6 +6,7 @@ const out = process.argv[3] ?? "docs/screenshots";
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1360, height: 860 }, deviceScaleFactor: 2 });
 await page.goto(base);
+await page.getByLabel("HackerOne username").waitFor({ timeout: 90_000 });
 await page.screenshot({ path: `${out}/onboarding.png` });
 await page.getByLabel("HackerOne username").fill("researcher");
 await page.getByLabel("API token").fill("valid-token");
@@ -19,7 +20,9 @@ await page.evaluate((hash) => {
   location.hash = hash;
 }, "#/compose?program=acme");
 await page.getByRole("heading", { name: "New report" }).waitFor();
-await page.getByLabel("Asset", { exact: true }).selectOption({ label: "api.acme.com" });
+await page.getByLabel("Asset", { exact: true }).click();
+await page.getByRole("option", { name: "api.acme.com" }).click();
+await page.getByRole("radio", { name: "High" }).click();
 await page.getByPlaceholder("Report title").fill("IDOR on invoice export");
 await page
   .getByRole("textbox", { name: "Vulnerability information" })

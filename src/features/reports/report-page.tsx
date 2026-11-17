@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { hackerOne } from "@/domain/deep-links";
 import { formatBytes, formatDateTime, formatMoney, formatRelative, humanize } from "@/domain/format";
 import { activityLabel, bountyTotal } from "@/domain/reports";
+import { ProgramLabel } from "@/features/programs/program-label";
 import { useViewAction } from "@/features/shell/view-actions";
 import { useReport } from "./use-reports";
 
@@ -36,7 +37,10 @@ function Metadata({ report }: { report: Report }) {
     [
       "Program",
       report.program ? (
-        <ExternalLink href={hackerOne.program(report.program.handle)}>{report.program.handle}</ExternalLink>
+        <span className="inline-flex items-center gap-2">
+          <ProgramLabel handle={report.program.handle} />
+          <ExternalLink href={hackerOne.program(report.program.handle)}>Open</ExternalLink>
+        </span>
       ) : (
         "Unknown"
       ),

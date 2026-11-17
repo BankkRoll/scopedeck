@@ -79,8 +79,9 @@ keychain.
   the UI never supplies a file path.
 - **Sanitized Markdown.** Report and policy Markdown is rendered with a strict allowlist. Images
   and raw HTML are stripped, and links open externally only when they point at hackerone.com.
-- **Nothing is sent anywhere else.** The only network peers are `api.hackerone.com` and, for
-  updates, GitHub Releases.
+- **Nothing is sent anywhere else.** The only network peers are `api.hackerone.com`,
+  HackerOne's logo CDN (`profile-photos.hackerone-user-content.com`, images only, no
+  credentials) and, for updates, GitHub Releases.
 
 Signing out deletes the keychain entry and the local cache. Report vulnerabilities in Scopedeck
 itself as described in [SECURITY.md](SECURITY.md).

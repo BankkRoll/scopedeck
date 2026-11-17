@@ -19,6 +19,7 @@ import {
 } from "@/ipc/intents";
 import { ErrorNotice } from "@/components/status";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, Textarea } from "@/components/ui/field";
 import { formatBytes, humanize } from "@/domain/format";
 import { cn } from "@/lib/cn";
@@ -280,14 +281,10 @@ export function IntentTracker({ intentId, onSubmitted, onDeleted }: IntentTracke
           </Button>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 text-[13px] text-muted">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={confirmed}
                 disabled={data.phase !== "ready"}
-                onChange={(event) => {
-                  setConfirmed(event.target.checked);
-                }}
-                className="size-3.5 accent-[var(--accent)]"
+                onCheckedChange={setConfirmed}
               />
               I reviewed this. Submitting cannot be undone.
             </label>

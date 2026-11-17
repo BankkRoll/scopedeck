@@ -4,6 +4,8 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import type { ProgramRow } from "@/ipc/programs";
 import { DataTable } from "@/components/data-table";
 import { EmptyState, ErrorNotice, PageHeader, SyncStatus } from "@/components/status";
+import { ProgramAvatar } from "@/components/program-avatar";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/field";
 import { formatMoney, humanize } from "@/domain/format";
 import { cn } from "@/lib/cn";
@@ -22,6 +24,16 @@ const FILTERS: { value: Filter; label: string }[] = [
 
 const helper = columnHelper<ProgramRow>();
 
+function SubmissionState({ state }: { state: string }) {
+  const tone = state === "open" ? "bg-success" : state === "paused" ? "bg-warning" : "bg-line-strong";
+  return (
+    <span className={cn("inline-flex items-center gap-1.5", state === "open" ? "text-ink" : "text-muted")}>
+      <span className={cn("size-1.5 rounded-full", tone)} aria-hidden />
+      {state ? humanize(state) : "Unknown"}
+    </span>
+  );
+}
+
 function PinButton({ row }: { row: ProgramRow }) {
   const pin = usePinProgram();
   return (
@@ -35,7 +47,7 @@ function PinButton({ row }: { row: ProgramRow }) {
       }}
       className="grid size-6 place-items-center rounded-sm text-faint hover:bg-hover hover:text-ink"
     >
-      <Star className={cn("size-3.5", row.pinned && "fill-ink text-ink")} />
+      <Star className={cn("size-3.5", row.pinned && "fill-warning text-warning")} />
     </button>
   );
 }
@@ -51,45 +63,54 @@ const columns = helper.columns([
     header: "Program",
     sortFn: "text",
     cell: (info) => (
-      <span className="flex min-w-0 items-baseline gap-2">
+      <span className="flex min-w-0 items-center gap-2.5">
+        <ProgramAvatar name={info.getValue()} src={info.row.original.profilePicture} />
         <span className="truncate text-ink">{info.getValue()}</span>
-        <span className="truncate font-mono text-faint">{info.row.original.handle}</span>
+        <span className="truncate font-mono text-[12px] text-faint">{info.row.original.handle}</span>
       </span>
     ),
   }),
-  helper.accessor((row) => row.state ?? "", {
-    id: "visibility",
-    header: "Visibility",
-    size: 120,
-    cell: (info) => <span className="text-muted">{humanize(info.getValue().replace(/_mode$/, ""))}</span>,
+  helper.accessor((row) => (row.offersBounties ? 1 : 0), {
+    id: "type",
+    header: "Type",
+    size: 100,
+    cell: (info) =>
+      info.getValue() ? <Badge className="border-accent/40 text-link">Bounty</Badge> : <Badge>VDP</Badge>,
   }),
   helper.accessor((row) => row.submissionState ?? "", {
     id: "submission",
     header: "Submissions",
-    size: 120,
-    cell: (info) => <span className="text-muted">{humanize(info.getValue())}</span>,
+    size: 130,
+    cell: (info) => <SubmissionState state={info.getValue()} />,
   }),
-  helper.accessor((row) => (row.offersBounties ? 1 : 0), {
-    id: "bounties",
-    header: "Bounties",
-    size: 100,
-    cell: (info) => <span className="text-muted">{info.getValue() ? "Yes" : "No"}</span>,
+  helper.accessor((row) => row.state ?? "", {
+    id: "visibility",
+    header: "Visibility",
+    size: 110,
+    cell: (info) => <span className="text-muted">{humanize(info.getValue().replace(/_mode$/, ""))}</span>,
   }),
   helper.accessor((row) => row.numberOfReportsForUser ?? 0, {
     id: "reports",
     header: "My reports",
     size: 110,
-    cell: (info) => <span className="font-mono text-muted tabular-nums">{info.getValue()}</span>,
+    cell: (info) => (
+      <span className={cn("font-mono tabular-nums", info.getValue() ? "text-ink" : "text-faint")}>
+        {info.getValue() || "–"}
+      </span>
+    ),
   }),
   helper.accessor((row) => row.bountyEarnedForUser ?? 0, {
     id: "earned",
     header: "Earned",
-    size: 110,
-    cell: (info) => (
-      <span className="font-mono text-muted tabular-nums">
-        {info.getValue() > 0 ? formatMoney(info.getValue(), info.row.original.currency ?? "USD") : ""}
-      </span>
-    ),
+    size: 120,
+    cell: (info) =>
+      info.getValue() > 0 ? (
+        <span className="font-mono text-success tabular-nums">
+          {formatMoney(info.getValue(), info.row.original.currency ?? "USD")}
+        </span>
+      ) : (
+        <span className="text-faint">–</span>
+      ),
   }),
 ]);
 
@@ -120,6 +141,16 @@ export function ProgramsPage() {
       })
       .sort((a, b) => Number(b.pinned) - Number(a.pinned));
   }, [programs.data, search.data, query, filter]);
+
+  const counts = useMemo(() => {
+    const all = programs.data ?? [];
+    return {
+      all: all.length,
+      pinned: all.filter((row) => row.pinned).length,
+      bounties: all.filter((row) => row.offersBounties === true).length,
+      open: all.filter((row) => row.submissionState === "open").length,
+    } satisfies Record<Filter, number>;
+  }, [programs.data]);
 
   return (
     <>
@@ -155,6 +186,11 @@ export function ProgramsPage() {
               className="h-7 rounded-md px-2.5 text-[13px] text-muted hover:bg-hover hover:text-ink aria-checked:bg-raised aria-checked:text-ink"
             >
               {option.label}
+              {programs.data ? (
+                <span className="ml-1.5 font-mono text-[12px] text-faint tabular-nums">
+                  {counts[option.value]}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>

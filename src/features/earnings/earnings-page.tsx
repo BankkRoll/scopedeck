@@ -23,6 +23,7 @@ import {
 } from "@/domain/earnings";
 import { formatDate, formatMoney, humanize } from "@/domain/format";
 import { columnHelper } from "@/lib/table";
+import { ProgramLabel } from "@/features/programs/program-label";
 import { useViewAction } from "@/features/shell/view-actions";
 import { queryKeys } from "@/query/keys";
 import { useCachedResource } from "@/query/use-cached-resource";
@@ -40,6 +41,9 @@ const earningColumns = earningHelper.columns([
   earningHelper.accessor((row) => row.programName ?? row.programHandle ?? "", {
     id: "program",
     header: "Program",
+    cell: (info) => (
+      <ProgramLabel handle={info.row.original.programHandle} name={info.row.original.programName} />
+    ),
   }),
   earningHelper.accessor((row) => row.reportId ?? "", {
     id: "report",

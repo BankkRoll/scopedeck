@@ -1,4 +1,10 @@
+import type { Page } from "@playwright/test";
 import { expect, signIn, test } from "./fixtures";
+
+async function pick(page: Page, label: string, option: string) {
+  await page.getByLabel(label, { exact: true }).click();
+  await page.getByRole("option", { name: option }).click();
+}
 
 test("onboarding rejects bad credentials, then connects with a valid token", async ({ page }) => {
   await page.goto("/");
@@ -19,7 +25,7 @@ test("browses a program, its scope, exclusions and sanitized policy", async ({ s
   await expect(page.getByText("legacy.acme.com")).toBeHidden();
   await expect(page.getByText("New", { exact: true })).toBeVisible();
 
-  await page.getByLabel("Only assets accepting submissions").uncheck();
+  await page.getByRole("switch", { name: "Only assets accepting submissions" }).click();
   await expect(page.getByText("legacy.acme.com")).toBeVisible();
 
   await page.getByRole("tab", { name: /Exclusions/ }).click();
@@ -33,11 +39,12 @@ test("browses a program, its scope, exclusions and sanitized policy", async ({ s
 test("composes a report, reviews the exact payload and submits it", async ({ signedIn: page }) => {
   await page.getByRole("link", { name: "New report" }).click();
   await expect(page.getByRole("heading", { name: "New report" })).toBeVisible();
-  await page.getByLabel("Program", { exact: true }).selectOption("acme");
+  await pick(page, "Program", "Acme Corp");
   await expect(page.getByLabel("Asset")).toBeEnabled();
-  await expect(page.getByLabel("Asset").locator("option", { hasText: "legacy.acme.com" })).toHaveCount(0);
-  await page.getByLabel("Asset").selectOption({ label: "api.acme.com" });
-  await page.getByLabel("Weakness").selectOption({ label: "Insecure Direct Object Reference (IDOR)" });
+  await page.getByLabel("Asset").click();
+  await expect(page.getByRole("option", { name: "legacy.acme.com" })).toHaveCount(0);
+  await page.getByRole("option", { name: "api.acme.com" }).click();
+  await pick(page, "Weakness", "Insecure Direct Object Reference (IDOR)");
   await page.getByRole("radio", { name: "High" }).click();
   await page.getByPlaceholder("Report title").fill("IDOR on invoice export");
 

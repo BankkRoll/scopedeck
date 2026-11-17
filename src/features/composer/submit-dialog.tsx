@@ -6,6 +6,7 @@ import { reportPreview, reportSubmit, type NewReport } from "@/ipc/reports";
 import type { DraftAttachment } from "@/ipc/workspace";
 import { ErrorNotice } from "@/components/status";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog } from "@/components/ui/dialog";
 import { formatBytes } from "@/domain/format";
 import { IntentTracker } from "@/features/intents/intent-tracker";
@@ -32,15 +33,8 @@ interface SubmitDialogProps {
 function Confirm({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
   return (
     <label className="mr-auto flex items-center gap-2 text-[13px] text-muted">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => {
-          onChange(event.target.checked);
-        }}
-        className="size-3.5 accent-[var(--accent)]"
-      />
-      I reviewed exactly what will be sent. Submitting cannot be undone.
+      <Checkbox checked={checked} onCheckedChange={onChange} />I reviewed exactly what will be sent.
+      Submitting cannot be undone.
     </label>
   );
 }

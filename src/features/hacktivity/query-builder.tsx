@@ -1,8 +1,11 @@
 import { useId } from "react";
 import type { SeverityRating } from "@/ipc/common";
 import { hacktivitySortSchema, type HacktivitySort } from "@/ipc/hacktivity";
-import { Field, Input, Select, Textarea } from "@/components/ui/field";
-import { humanize } from "@/domain/format";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Field, Input, Textarea } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
+import { assetTypeLabel, humanize } from "@/domain/format";
 import {
   ASSET_TYPES,
   filterProblems,
@@ -24,6 +27,14 @@ const SORT_LABELS: Record<HacktivitySort, string> = {
   "-votes": "Most votes",
   votes: "Fewest votes",
 };
+
+const SORT_OPTIONS = hacktivitySortSchema.options.map((value) => ({ value, label: SORT_LABELS[value] }));
+
+const COLLABORATION_OPTIONS = [
+  { value: "any", label: "Any" },
+  { value: "yes", label: "Collaborations only" },
+  { value: "no", label: "Solo only" },
+] as const;
 
 function Toggle({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: string }) {
   return (
@@ -70,6 +81,7 @@ export function QueryBuilder({ state, onChange }: QueryBuilderProps) {
     from: useId(),
     to: useId(),
     collaboration: useId(),
+    disclosed: useId(),
     sort: useId(),
   };
   const filters = state.filters;
@@ -110,17 +122,11 @@ export function QueryBuilder({ state, onChange }: QueryBuilderProps) {
           id={ids.sort}
           className="w-48"
           value={state.sort}
-          onChange={(event) => {
-            const sort = hacktivitySortSchema.safeParse(event.target.value);
-            if (sort.success) onChange({ ...state, sort: sort.data });
+          onValueChange={(sort) => {
+            onChange({ ...state, sort });
           }}
-        >
-          {hacktivitySortSchema.options.map((sort) => (
-            <option key={sort} value={sort}>
-              {SORT_LABELS[sort]}
-            </option>
-          ))}
-        </Select>
+          options={SORT_OPTIONS}
+        />
       </div>
 
       {state.mode === "raw" ? (
@@ -165,7 +171,7 @@ export function QueryBuilder({ state, onChange }: QueryBuilderProps) {
                   set({ assetTypes: toggle(filters.assetTypes, assetType) });
                 }}
               >
-                {humanize(assetType.toLowerCase())}
+                {assetTypeLabel(assetType)}
               </Toggle>
             ))}
           </div>
@@ -229,22 +235,21 @@ export function QueryBuilder({ state, onChange }: QueryBuilderProps) {
               />
             </Field>
             <Field label="Disclosed from" htmlFor={ids.from}>
-              <Input
+              <DatePicker
                 id={ids.from}
-                type="date"
-                value={filters.disclosedFrom ?? ""}
-                onChange={(event) => {
-                  set({ disclosedFrom: event.target.value || null });
+                value={filters.disclosedFrom}
+                onChange={(disclosedFrom) => {
+                  set({ disclosedFrom });
                 }}
               />
             </Field>
             <Field label="Disclosed to" htmlFor={ids.to} error={problem("disclosedTo")}>
-              <Input
+              <DatePicker
                 id={ids.to}
-                type="date"
-                value={filters.disclosedTo ?? ""}
-                onChange={(event) => {
-                  set({ disclosedTo: event.target.value || null });
+                value={filters.disclosedTo}
+                invalid={Boolean(problem("disclosedTo"))}
+                onChange={(disclosedTo) => {
+                  set({ disclosedTo });
                 }}
               />
             </Field>
@@ -256,29 +261,26 @@ export function QueryBuilder({ state, onChange }: QueryBuilderProps) {
               </label>
               <Select
                 id={ids.collaboration}
-                className="w-40"
+                className="w-44"
                 value={filters.collaboration}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  if (value === "any" || value === "yes" || value === "no") set({ collaboration: value });
+                onValueChange={(collaboration) => {
+                  set({ collaboration });
                 }}
-              >
-                <option value="any">Any</option>
-                <option value="yes">Collaborations only</option>
-                <option value="no">Solo only</option>
-              </Select>
-            </div>
-            <label className="flex items-center gap-2 text-[13px] text-muted">
-              <input
-                type="checkbox"
-                checked={filters.disclosedOnly}
-                onChange={(event) => {
-                  set({ disclosedOnly: event.target.checked });
-                }}
-                className="size-3.5 accent-[var(--accent)]"
+                options={COLLABORATION_OPTIONS}
               />
-              Disclosed reports only
-            </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id={ids.disclosed}
+                checked={filters.disclosedOnly}
+                onCheckedChange={(disclosedOnly) => {
+                  set({ disclosedOnly });
+                }}
+              />
+              <label htmlFor={ids.disclosed} className="text-[13px] text-muted">
+                Disclosed reports only
+              </label>
+            </div>
           </div>
         </>
       )}

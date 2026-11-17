@@ -3,10 +3,12 @@ import { ArrowUpRight, Star } from "lucide-react";
 import { openOnHackerOne } from "@/lib/open-external";
 import { Markdown } from "@/components/markdown";
 import { EmptyState, ErrorNotice, PageHeader, SyncStatus } from "@/components/status";
+import { ProgramAvatar } from "@/components/program-avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { hackerOne } from "@/domain/deep-links";
-import { humanize } from "@/domain/format";
+import { formatDate, formatMoney, humanize } from "@/domain/format";
 import { cn } from "@/lib/cn";
 import { useViewAction } from "@/features/shell/view-actions";
 import { ScopePanel } from "./scope-panel";
@@ -39,7 +41,7 @@ export function ProgramPage() {
                   pin.mutate({ handle, pinned: !program.pinned });
                 }}
               >
-                <Star className={cn(program.pinned && "fill-ink text-ink")} />
+                <Star className={cn(program.pinned && "fill-warning text-warning")} />
               </Button>
             ) : null}
             <Button variant="secondary" onClick={() => void openOnHackerOne(hackerOne.programScope(handle))}>
@@ -58,20 +60,57 @@ export function ProgramPage() {
       />
       {detail.syncError ? <ErrorNotice error={detail.syncError} className="mx-5 mt-3" /> : null}
       {program ? (
-        <dl className="flex shrink-0 flex-wrap gap-x-8 gap-y-2 border-b border-line px-5 py-3 text-[13px]">
-          {[
-            ["Submissions", humanize(program.submissionState)],
-            ["Bounties", program.offersBounties ? "Offered" : "None"],
-            ["Visibility", humanize(program.state?.replace(/_mode$/, ""))],
-            ["Fast payments", program.fastPayments ? "Yes" : "No"],
-            ["Gold standard safe harbor", program.goldStandardSafeHarbor ? "Yes" : "No"],
-          ].map(([label, value]) => (
-            <div key={label} className="flex gap-2">
-              <dt className="text-faint">{label}</dt>
-              <dd className="text-ink">{value === "" ? "Unknown" : value}</dd>
+        <div className="flex shrink-0 items-center gap-6 border-b border-line px-5 py-4">
+          <ProgramAvatar name={name} src={program.profilePicture} size="lg" />
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {program.offersBounties ? (
+                <Badge className="border-accent/40 text-link">Bounty program</Badge>
+              ) : (
+                <Badge>Vulnerability disclosure</Badge>
+              )}
+              <Badge>
+                <span
+                  className={cn(
+                    "size-1.5 rounded-full",
+                    program.submissionState === "open" ? "bg-success" : "bg-warning",
+                  )}
+                  aria-hidden
+                />
+                {program.submissionState === "open"
+                  ? "Accepting reports"
+                  : humanize(program.submissionState) || "Unknown"}
+              </Badge>
+              <Badge>{humanize(program.state?.replace(/_mode$/, "")) || "Unknown"}</Badge>
+              {program.fastPayments ? <Badge>Fast payments</Badge> : null}
+              {program.goldStandardSafeHarbor ? <Badge>Gold standard safe harbor</Badge> : null}
+              {program.openScope ? <Badge>Open scope</Badge> : null}
+              {program.allowsBountySplitting ? <Badge>Bounty splitting</Badge> : null}
             </div>
-          ))}
-        </dl>
+            {program.startedAcceptingAt ? (
+              <p className="text-[13px] text-faint">
+                Accepting reports since {formatDate(program.startedAcceptingAt)}
+              </p>
+            ) : null}
+          </div>
+          <dl className="grid shrink-0 grid-cols-3 divide-x divide-line rounded-md border border-line">
+            {[
+              ["My reports", String(program.numberOfReportsForUser ?? 0)],
+              ["Valid", String(program.numberOfValidReportsForUser ?? 0)],
+              [
+                "Earned",
+                program.bountyEarnedForUser
+                  ? formatMoney(program.bountyEarnedForUser, program.currency ?? "USD")
+                  : "$0",
+              ],
+            ].map(([label, value]) => (
+              <div key={label} className="flex min-w-24 flex-col gap-0.5 px-4 py-2">
+                <dt className="text-[12px] text-faint">{label}</dt>
+                <dd className="font-mono text-[15px] text-ink tabular-nums">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       ) : null}
       <Tabs defaultValue="scope" className="flex min-h-0 flex-1 flex-col">
         <TabsList>

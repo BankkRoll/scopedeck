@@ -10,7 +10,8 @@ import { openOnHackerOne } from "@/lib/open-external";
 import { ErrorNotice, PageHeader } from "@/components/status";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Select } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { hackerOne } from "@/domain/deep-links";
 import { CredentialForm } from "@/features/auth/onboarding";
 import { queryKeys } from "@/query/keys";
@@ -47,7 +48,16 @@ function Row({ label, htmlFor, children }: { label: string; htmlFor?: string; ch
   );
 }
 
-const INTERVALS = [5, 15, 30, 60, 240];
+const INTERVALS = [5, 15, 30, 60, 240].map((minutes) => ({
+  value: String(minutes),
+  label: minutes < 60 ? `${minutes} minutes` : `${minutes / 60} ${minutes === 60 ? "hour" : "hours"}`,
+}));
+
+const THEMES = [
+  { value: "dark", label: "Dark" },
+  { value: "light", label: "Light" },
+  { value: "system", label: "Match system" },
+] as const;
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
@@ -103,15 +113,9 @@ export function SettingsPage() {
               id={ids.theme}
               className="w-40"
               value={settings.theme}
-              onChange={(event) => {
-                const theme = event.target.value;
-                if (theme === "dark" || theme === "light" || theme === "system") void apply({ theme });
-              }}
-            >
-              <option value="dark">Dark</option>
-              <option value="light">Light</option>
-              <option value="system">Match system</option>
-            </Select>
+              onValueChange={(theme) => void apply({ theme })}
+              options={THEMES}
+            />
           </Row>
         </Section>
 
@@ -123,28 +127,19 @@ export function SettingsPage() {
             <Select
               id={ids.interval}
               className="w-40"
-              value={settings.syncIntervalMinutes}
-              onChange={(event) => void apply({ syncIntervalMinutes: Number(event.target.value) })}
-            >
-              {INTERVALS.map((minutes) => (
-                <option key={minutes} value={minutes}>
-                  {minutes < 60
-                    ? `${minutes} minutes`
-                    : `${minutes / 60} ${minutes === 60 ? "hour" : "hours"}`}
-                </option>
-              ))}
-            </Select>
+              value={String(settings.syncIntervalMinutes)}
+              onValueChange={(minutes) => void apply({ syncIntervalMinutes: Number(minutes) })}
+              options={INTERVALS}
+            />
           </Row>
           <Row label="Notify me when a report changes state or gets new activity" htmlFor={ids.notifications}>
-            <input
+            <Switch
               id={ids.notifications}
-              type="checkbox"
               checked={settings.notifications}
               disabled={notifications.isPending}
-              onChange={(event) => {
-                notifications.mutate(event.target.checked);
+              onCheckedChange={(enabled) => {
+                notifications.mutate(enabled);
               }}
-              className="size-4 accent-[var(--accent)]"
             />
           </Row>
           <Row label="Clear cached programs, reports, hacktivity and earnings">

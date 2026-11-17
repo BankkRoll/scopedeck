@@ -2,11 +2,20 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { Report } from "@/ipc/reports";
 import { DataTable } from "@/components/data-table";
-import { EmptyState, ErrorNotice, PageHeader, SeverityLabel, SyncStatus } from "@/components/status";
-import { Input, Select } from "@/components/ui/field";
+import {
+  EmptyState,
+  ErrorNotice,
+  PageHeader,
+  ReportStateLabel,
+  SeverityLabel,
+  SyncStatus,
+} from "@/components/status";
+import { Input } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
 import { formatMoney, formatRelative, humanize } from "@/domain/format";
 import { OPEN_STATES, REPORT_STATES, bountyTotal, reportMatches } from "@/domain/reports";
 import { columnHelper } from "@/lib/table";
+import { ProgramLabel } from "@/features/programs/program-label";
 import { useViewAction } from "@/features/shell/view-actions";
 import { useReports } from "./use-reports";
 
@@ -29,18 +38,14 @@ const columns = helper.columns([
   helper.accessor((row) => row.program?.handle ?? "", {
     id: "program",
     header: "Program",
-    size: 150,
-    cell: (info) => <span className="font-mono text-muted">{info.getValue()}</span>,
+    size: 190,
+    cell: (info) => <ProgramLabel handle={info.getValue()} />,
   }),
   helper.accessor((row) => row.state ?? "", {
     id: "state",
     header: "State",
     size: 150,
-    cell: (info) => (
-      <span className={OPEN_STATES.has(info.getValue()) ? "text-ink" : "text-muted"}>
-        {humanize(info.getValue())}
-      </span>
-    ),
+    cell: (info) => <ReportStateLabel state={info.getValue()} />,
   }),
   helper.accessor((row) => SEVERITY_ORDER[row.severity?.rating?.toLowerCase() ?? ""] ?? 0, {
     id: "severity",
@@ -89,6 +94,37 @@ export function ReportsPage() {
     [reports.data, query, state],
   );
 
+  const stateOptions = useMemo(() => {
+    const all = reports.data ?? [];
+    const count = (match: (state: string) => boolean) =>
+      all.filter((report) => match(report.state ?? "")).length;
+    const option = (value: string, label: string, total: number) => ({
+      value,
+      textValue: label,
+      label: (
+        <span className="flex w-full items-center justify-between gap-6">
+          {label}
+          <span className="font-mono text-faint tabular-nums">{total}</span>
+        </span>
+      ),
+    });
+    return [
+      option(
+        "open",
+        "Open",
+        count((value) => OPEN_STATES.has(value)),
+      ),
+      option("all", "All states", all.length),
+      ...REPORT_STATES.map((value) =>
+        option(
+          value,
+          humanize(value),
+          count((s) => s === value),
+        ),
+      ),
+    ];
+  }, [reports.data]);
+
   return (
     <>
       <PageHeader
@@ -113,19 +149,10 @@ export function ReportsPage() {
         <Select
           aria-label="Filter by state"
           value={state}
-          onChange={(event) => {
-            setState(event.target.value);
-          }}
-          className="w-52"
-        >
-          <option value="open">Open</option>
-          <option value="all">All states</option>
-          {REPORT_STATES.map((value) => (
-            <option key={value} value={value}>
-              {humanize(value)}
-            </option>
-          ))}
-        </Select>
+          onValueChange={setState}
+          options={stateOptions}
+          className="w-56"
+        />
       </div>
       {reports.syncError ? <ErrorNotice error={reports.syncError} className="mx-5 mt-3" /> : null}
       <DataTable

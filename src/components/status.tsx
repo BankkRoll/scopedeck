@@ -106,3 +106,30 @@ export function PageHeader({
     </header>
   );
 }
+
+const STATE_TONE: Record<string, string> = {
+  new: "bg-accent",
+  "pending-program-review": "bg-accent",
+  triaged: "bg-accent",
+  retesting: "bg-accent",
+  "needs-more-info": "bg-warning",
+  resolved: "bg-success",
+  informative: "bg-sev-none",
+  duplicate: "bg-sev-none",
+  "not-applicable": "bg-sev-none",
+  spam: "bg-danger",
+};
+
+/** A report state with a colored dot: blue in progress, amber waiting on you, green resolved. */
+export function ReportStateLabel({ state }: { state: string | null | undefined }) {
+  if (!state) return <span className="text-faint">Unknown</span>;
+  const tone = STATE_TONE[state] ?? "bg-sev-none";
+  return (
+    <span
+      className={cn("inline-flex items-center gap-1.5", tone === "bg-sev-none" ? "text-muted" : "text-ink")}
+    >
+      <span className={cn("size-1.5 rounded-full", tone)} aria-hidden />
+      {humanize(state)}
+    </span>
+  );
+}

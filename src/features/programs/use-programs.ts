@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { toast } from "sonner";
 import type { Cached } from "@/ipc/common";
 import { describeError, toAppError } from "@/ipc/errors";
@@ -70,4 +71,20 @@ export function usePinProgram() {
       toast.error(describeError(toAppError(error)).title);
     },
   });
+}
+
+/**
+ * Programs by handle, from the local cache only. Lets reports, Hacktivity and earnings rows
+ * show program logos without triggering a sync.
+ */
+export function useProgramLookup(): ReadonlyMap<string, ProgramRow> {
+  const cached = useQuery({
+    queryKey: queryKeys.programs.cached,
+    queryFn: programsCached,
+    staleTime: Infinity,
+  });
+  return useMemo(
+    () => new Map((cached.data?.data ?? []).map((row) => [row.handle, row] as const)),
+    [cached.data],
+  );
 }
