@@ -1,0 +1,53 @@
+name: Bug report
+description: Something in Scopedeck does not work as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Security problems go through
+        [private vulnerability reporting](https://github.com/scopedeck/scopedeck/security/advisories/new),
+        not here. Never paste an API token, report contents or private program details into an
+        issue.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open …
+        2. Click …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Scopedeck version
+      description: The release you installed, for example 0.1.0.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options: [macOS, Windows, Linux]
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >-
+        Run the app with SCOPEDECK_LOG=scopedeck_lib=debug and paste the relevant lines. Tokens are
+        redacted automatically, but check for program names or report titles you do not want public.
+      render: text

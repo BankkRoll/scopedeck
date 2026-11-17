@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/scopedeck/scopedeck/security/advisories/new
+    about: Report vulnerabilities in Scopedeck privately.
+  - name: Problems with HackerOne itself
+    url: https://support.hackerone.com/
+    about: Scopedeck is not affiliated with HackerOne and cannot help with your account or programs.

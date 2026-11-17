@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest an improvement or a new capability.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How you would like it to work.
+  - type: textarea
+    id: api
+    attributes:
+      label: API support
+      description: >-
+        If this needs data from the Hacker API, link the endpoint in the API reference. Features
+        the API does not support can only link out to hackerone.com.
