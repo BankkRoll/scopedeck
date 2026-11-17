@@ -1,0 +1,9 @@
+pnpm-lock.yaml
+src-tauri/target
+src-tauri/gen
+dist
+coverage
+playwright-report
+test-results
+.agents
+.claude
