@@ -6,7 +6,7 @@ body:
     attributes:
       value: >-
         Security problems go through
-        [private vulnerability reporting](https://github.com/scopedeck/scopedeck/security/advisories/new),
+        [private vulnerability reporting](https://github.com/BankkRoll/scopedeck/security/advisories/new),
         not here. Never paste an API token, report contents or private program details into an
         issue.
   - type: textarea

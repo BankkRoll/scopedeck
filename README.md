@@ -46,7 +46,7 @@ is implemented and what is linked out.
 ## Install
 
 Download the installer for your platform from the
-[latest release](https://github.com/scopedeck/scopedeck/releases/latest):
+[latest release](https://github.com/BankkRoll/scopedeck/releases/latest):
 
 | Platform | File                                |
 | -------- | ----------------------------------- |

@@ -6,7 +6,7 @@ are taken seriously.
 ## Reporting a vulnerability
 
 Report privately through
-[GitHub private vulnerability reporting](https://github.com/scopedeck/scopedeck/security/advisories/new).
+[GitHub private vulnerability reporting](https://github.com/BankkRoll/scopedeck/security/advisories/new).
 Do not open a public issue, pull request or discussion for a security problem.
 
 Include:

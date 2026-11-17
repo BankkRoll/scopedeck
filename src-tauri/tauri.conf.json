@@ -60,7 +60,7 @@
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ5MEE2RTk1NjVFRDBGNzUKUldSMUQrMWxsVzRLMlZPNzJOSTJubnZ2VFVlbERmZEJ2MHRnbXhVSUJBSVhPQTV0ZDI4MG5MaEYK",
-      "endpoints": ["https://github.com/scopedeck/scopedeck/releases/latest/download/latest.json"]
+      "endpoints": ["https://github.com/BankkRoll/scopedeck/releases/latest/download/latest.json"]
     }
   }
 }

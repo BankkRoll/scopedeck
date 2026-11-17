@@ -35,7 +35,7 @@ someone represents the project elsewhere.
 ## Enforcement
 
 Report incidents privately to the maintainers through
-[GitHub private vulnerability reporting](https://github.com/scopedeck/scopedeck/security/advisories/new),
+[GitHub private vulnerability reporting](https://github.com/BankkRoll/scopedeck/security/advisories/new),
 with "Code of conduct" in the title. All reports are reviewed promptly and kept confidential.
 
 Maintainers follow the Contributor Covenant's

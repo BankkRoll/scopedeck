@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/scopedeck/scopedeck/blob/main/docs/finding-schema.json",
+  "$id": "https://github.com/BankkRoll/scopedeck/blob/main/docs/finding-schema.json",
   "title": "Scopedeck finding",
   "description": "A finding that Scopedeck can import into a report draft.",
   "type": "object",

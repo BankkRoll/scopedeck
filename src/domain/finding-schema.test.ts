@@ -9,7 +9,7 @@ it("docs/finding-schema.json matches the importer's schema", async () => {
   const { $schema, ...body } = z.toJSONSchema(findingSchema, { target: "draft-2020-12", io: "input" });
   const schema = {
     $schema,
-    $id: "https://github.com/scopedeck/scopedeck/blob/main/docs/finding-schema.json",
+    $id: "https://github.com/BankkRoll/scopedeck/blob/main/docs/finding-schema.json",
     title: "Scopedeck finding",
     description: "A finding that Scopedeck can import into a report draft.",
     ...body,
