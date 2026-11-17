@@ -154,8 +154,7 @@ struct ActorAttributes {
 #[derive(Debug, Deserialize)]
 struct ActivityAttributes {
     message: Option<String>,
-    #[serde(default)]
-    internal: bool,
+    internal: Option<bool>,
     created_at: Option<String>,
 }
 
@@ -268,7 +267,7 @@ fn activity_from(resource: Resource<ActivityAttributes, ActivityRelationships>) 
         id: resource.id,
         kind: resource.kind,
         message: resource.attributes.message,
-        internal: resource.attributes.internal,
+        internal: resource.attributes.internal.unwrap_or(false),
         created_at: resource.attributes.created_at,
         actor: One::into_inner(resource.relationships.actor).map(|actor| Actor {
             kind: actor.kind,
@@ -396,7 +395,7 @@ mod tests {
                 "structured_scope": { "data": { "id": "5", "type": "structured-scope", "attributes": { "asset_identifier": "acme.com", "asset_type": "url", "eligible_for_bounty": true, "eligible_for_submission": true, "max_severity": "critical" } } },
                 "activities": { "data": [{
                     "id": "1", "type": "activity-comment",
-                    "attributes": { "message": "Thanks", "internal": false, "created_at": "2026-01-02T00:00:00Z", "updated_at": "2026-01-02T00:00:00Z" },
+                    "attributes": { "message": "Thanks", "internal": null, "created_at": "2026-01-02T00:00:00Z", "updated_at": "2026-01-02T00:00:00Z" },
                     "relationships": {
                         "actor": { "data": { "id": "3", "type": "user", "attributes": { "username": "triager", "name": "T" } } },
                         "attachments": { "data": [] }

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::client::{ApiClient, Query};
+use super::client::{self, ApiClient, Query};
 use super::error::ApiError;
 use super::jsonapi::{Document, Resource};
 use super::rate_limit::Bucket;
@@ -218,9 +218,19 @@ pub(crate) async fn verify_access(client: &ApiClient) -> Result<(), ApiError> {
 }
 
 pub(crate) async fn get(client: &ApiClient, handle: &str) -> Result<Program, ApiError> {
-    let document: Document<Resource<ProgramAttributes>> =
-        client.get(client.endpoint(&["programs", handle]), &Vec::new(), Bucket::Read).await?;
-    Ok(document.data.into())
+    let url = client.endpoint(&["programs", handle]);
+    let path = url.path().to_owned();
+    let body: serde_json::Value = client.get(url, &Vec::new(), Bucket::Read).await?;
+    // Unlike every other endpoint, this one returns the program resource itself rather than a
+    // `data` envelope. Both shapes are accepted in case it is ever brought in line.
+    let resource = match body {
+        serde_json::Value::Object(mut object) if object.contains_key("data") => {
+            object.remove("data").unwrap_or_default()
+        }
+        other => other,
+    };
+    let resource: Resource<ProgramAttributes> = client::decode_value(&path, resource)?;
+    Ok(resource.into())
 }
 
 pub(crate) async fn structured_scopes(
@@ -331,7 +341,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn gets_single_program() {
+    async fn gets_bare_program() {
+        let server = MockServer::start().await;
+        Mock::given(path("/v1/hackers/programs/acme"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(program_json()))
+            .mount(&server)
+            .await;
+        let program = get(&client_for(&server), "acme").await.unwrap();
+        assert_eq!(program.policy.as_deref(), Some("# Policy"));
+    }
+
+    #[tokio::test]
+    async fn gets_enveloped_program() {
         let server = MockServer::start().await;
         Mock::given(path("/v1/hackers/programs/acme"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "data": program_json() })))

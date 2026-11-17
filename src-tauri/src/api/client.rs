@@ -78,8 +78,9 @@ impl ApiClient {
         query: &Query,
         bucket: Bucket,
     ) -> Result<T, ApiError> {
+        let path = url.path().to_owned();
         let bytes = self.send(Method::GET, url, query, Body::Empty, bucket).await?;
-        decode(&bytes)
+        decode(&path, &bytes)
     }
 
     pub(crate) async fn get_all<T: DeserializeOwned>(
@@ -112,13 +113,15 @@ impl ApiClient {
         body: Option<&serde_json::Value>,
     ) -> Result<T, ApiError> {
         let body = body.map_or(Body::Empty, Body::Json);
+        let path = url.path().to_owned();
         let bytes = self.send(method, url, &Vec::new(), body, Bucket::Write).await?;
-        decode(&bytes)
+        decode(&path, &bytes)
     }
 
     pub(crate) async fn upload<T: DeserializeOwned>(&self, url: Url, files: &[UploadFile]) -> Result<T, ApiError> {
+        let path = url.path().to_owned();
         let bytes = self.send(Method::POST, url, &Vec::new(), Body::Files(files), Bucket::Write).await?;
-        decode(&bytes)
+        decode(&path, &bytes)
     }
 
     // SECURITY: `links.next` comes from the response body. Credentials are attached to every
@@ -211,8 +214,20 @@ fn multipart_form(files: &[UploadFile]) -> Result<reqwest::multipart::Form, ApiE
     })
 }
 
-fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, ApiError> {
-    serde_json::from_slice(bytes).map_err(|error| ApiError::decode(&error))
+fn decode<T: DeserializeOwned>(path: &str, bytes: &[u8]) -> Result<T, ApiError> {
+    let mut deserializer = serde_json::Deserializer::from_slice(bytes);
+    serde_path_to_error::deserialize(&mut deserializer).map_err(|error| {
+        tracing::warn!(path, field = %error.path(), error = %error.inner(), "response did not match the expected shape");
+        ApiError::decode(&error)
+    })
+}
+
+/// Decodes an already-parsed body, with the same field-path diagnostics as a direct response.
+pub(crate) fn decode_value<T: DeserializeOwned>(path: &str, value: serde_json::Value) -> Result<T, ApiError> {
+    serde_path_to_error::deserialize(value).map_err(|error| {
+        tracing::warn!(path, field = %error.path(), error = %error.inner(), "response did not match the expected shape");
+        ApiError::decode(&error)
+    })
 }
 
 #[cfg(test)]

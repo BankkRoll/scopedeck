@@ -34,6 +34,7 @@ url = "2.5.8"
 rand = "0.10.4"
 time = { version = "0.3.55", features = ["formatting", "parsing", "macros"] }
 base64 = "0.23.1"
+serde_path_to_error = "0.1.20"
 
 [dev-dependencies]
 wiremock = "0.6.5"
