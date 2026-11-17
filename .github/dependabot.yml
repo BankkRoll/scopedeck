@@ -1,0 +1,31 @@
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+    groups:
+      tauri:
+        patterns: ["tauri", "tauri-*"]
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      tauri:
+        patterns: ["@tauri-apps/*"]
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # typescript-eslint supports TypeScript up to 6.0.x; newer majors break linting.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
