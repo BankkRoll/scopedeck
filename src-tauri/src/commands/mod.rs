@@ -3,6 +3,7 @@
     reason = "Tauri deserializes command arguments into owned values, and State must be taken by value"
 )]
 
+pub(crate) mod ai;
 pub(crate) mod auth;
 pub(crate) mod hacktivity;
 pub(crate) mod intents;

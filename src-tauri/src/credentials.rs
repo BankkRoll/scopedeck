@@ -3,6 +3,7 @@ use std::fmt;
 
 const KEYCHAIN_SERVICE: &str = "dev.scopedeck.app";
 const KEYCHAIN_ACCOUNT: &str = "hacker-api-credentials";
+const AI_KEY_ACCOUNT: &str = "ai-provider-key";
 
 #[derive(Clone)]
 pub(crate) struct ApiToken(String);
@@ -62,6 +63,14 @@ pub(crate) trait CredentialStore: Send + Sync {
     fn clear(&self) -> Result<(), CredentialError>;
 }
 
+/// Holds the AI provider API key, kept apart from the Hacker API credentials so either can be
+/// replaced or cleared without touching the other.
+pub(crate) trait AiKeyStore: Send + Sync {
+    fn load(&self) -> Result<Option<String>, CredentialError>;
+    fn save(&self, key: &str) -> Result<(), CredentialError>;
+    fn clear(&self) -> Result<(), CredentialError>;
+}
+
 #[derive(Serialize, Deserialize)]
 struct StoredCredentials {
     username: String,
@@ -72,8 +81,34 @@ pub(crate) struct KeychainStore;
 
 impl KeychainStore {
     fn entry() -> Result<keyring::Entry, CredentialError> {
-        keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT)
+        Self::entry_for(KEYCHAIN_ACCOUNT)
+    }
+
+    fn entry_for(account: &str) -> Result<keyring::Entry, CredentialError> {
+        keyring::Entry::new(KEYCHAIN_SERVICE, account).map_err(|error| CredentialError::Unavailable(error.to_string()))
+    }
+}
+
+impl AiKeyStore for KeychainStore {
+    fn load(&self) -> Result<Option<String>, CredentialError> {
+        match Self::entry_for(AI_KEY_ACCOUNT)?.get_password() {
+            Ok(key) => Ok(Some(key)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(error) => Err(CredentialError::Unavailable(error.to_string())),
+        }
+    }
+
+    fn save(&self, key: &str) -> Result<(), CredentialError> {
+        Self::entry_for(AI_KEY_ACCOUNT)?
+            .set_password(key)
             .map_err(|error| CredentialError::Unavailable(error.to_string()))
+    }
+
+    fn clear(&self) -> Result<(), CredentialError> {
+        match Self::entry_for(AI_KEY_ACCOUNT)?.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(error) => Err(CredentialError::Unavailable(error.to_string())),
+        }
     }
 }
 
@@ -126,6 +161,25 @@ pub(crate) mod memory {
 
         fn save(&self, credentials: &Credentials) -> Result<(), CredentialError> {
             *self.0.lock().unwrap() = Some((credentials.username.clone(), credentials.token.expose().to_owned()));
+            Ok(())
+        }
+
+        fn clear(&self) -> Result<(), CredentialError> {
+            *self.0.lock().unwrap() = None;
+            Ok(())
+        }
+    }
+
+    #[derive(Default)]
+    pub(crate) struct MemoryAiKeyStore(pub(crate) Mutex<Option<String>>);
+
+    impl AiKeyStore for MemoryAiKeyStore {
+        fn load(&self) -> Result<Option<String>, CredentialError> {
+            Ok(self.0.lock().unwrap().clone())
+        }
+
+        fn save(&self, key: &str) -> Result<(), CredentialError> {
+            *self.0.lock().unwrap() = Some(key.to_owned());
             Ok(())
         }
 

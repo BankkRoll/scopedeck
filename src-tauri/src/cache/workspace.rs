@@ -3,9 +3,11 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 use super::{CacheError, from_json, new_id, now, to_json};
+use crate::ai::AiConfig;
 use crate::api::reports::SeverityRating;
 
 const SETTINGS_KEY: &str = "settings";
+const AI_SETTINGS_KEY: &str = "ai_settings";
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -276,6 +278,22 @@ pub(crate) fn save_settings(conn: &Connection, settings: Settings) -> Result<Set
     Ok(settings)
 }
 
+/// AI provider preferences. A row that no longer parses (for example after a provider was
+/// removed) falls back to the defaults, which leave the assistant disabled.
+pub(crate) fn ai_config(conn: &Connection) -> Result<AiConfig, CacheError> {
+    let raw: Option<String> =
+        conn.query_row("SELECT value FROM kv WHERE key = ?1", [AI_SETTINGS_KEY], |row| row.get(0)).optional()?;
+    Ok(raw.as_deref().and_then(|raw| from_json::<AiConfig>(raw).ok()).unwrap_or_default())
+}
+
+pub(crate) fn save_ai_config(conn: &Connection, config: &AiConfig) -> Result<(), CacheError> {
+    conn.execute(
+        "INSERT INTO kv (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![AI_SETTINGS_KEY, to_json(config)?],
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -312,6 +330,28 @@ mod tests {
             .unwrap();
         assert_eq!(saved.sync_interval_minutes, 5);
         assert_eq!(cache.with(|conn| settings(conn)).unwrap().theme, Theme::Light);
+    }
+
+    #[test]
+    fn ai_config_defaults_to_disabled_and_round_trips() {
+        let cache = Cache::in_memory().unwrap();
+        assert_eq!(cache.with(|conn| ai_config(conn)).unwrap(), AiConfig::default());
+        assert!(!AiConfig::default().enabled);
+        let config = AiConfig {
+            provider: crate::ai::Provider::Openai,
+            model: "gpt-5-mini".into(),
+            base_url: Some("https://gw.example.com/".into()),
+            enabled: true,
+        };
+        cache.with(|conn| save_ai_config(conn, &config)).unwrap();
+        assert_eq!(cache.with(|conn| ai_config(conn)).unwrap(), config);
+        cache
+            .with(|conn| {
+                conn.execute("UPDATE kv SET value = '{\"provider\":\"gone\"}' WHERE key = ?1", [AI_SETTINGS_KEY])?;
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(cache.with(|conn| ai_config(conn)).unwrap(), AiConfig::default());
     }
 
     #[test]

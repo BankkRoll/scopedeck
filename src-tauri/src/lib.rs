@@ -1,6 +1,7 @@
 #![deny(clippy::all)]
 #![warn(clippy::pedantic)]
 
+mod ai;
 mod api;
 mod background;
 mod cache;
@@ -66,7 +67,7 @@ pub fn run() {
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
             let cache = Cache::open(data_dir.join("cache.sqlite3"))?;
-            app.manage(AppState::new(api_base_url(), cache, Box::new(KeychainStore), secrets));
+            app.manage(AppState::new(api_base_url(), cache, Box::new(KeychainStore), Box::new(KeychainStore), secrets));
             background::spawn(app.handle().clone());
             Ok(())
         })
@@ -79,6 +80,8 @@ pub fn run() {
             commands::programs::program_cached,
             commands::programs::program_sync,
             commands::programs::program_set_pinned,
+            commands::programs::program_note_get,
+            commands::programs::program_note_save,
             commands::programs::local_search,
             commands::reports::reports_cached,
             commands::reports::reports_sync,
@@ -115,6 +118,10 @@ pub fn run() {
             commands::workspace::settings_get,
             commands::workspace::settings_save,
             commands::workspace::cache_clear,
+            commands::ai::ai_settings_get,
+            commands::ai::ai_settings_save,
+            commands::ai::ai_test,
+            commands::ai::ai_complete,
             commands::system::open_external,
             commands::system::save_text_file,
             commands::system::notifications_enable,

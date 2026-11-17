@@ -1,6 +1,7 @@
 use rusqlite::Connection;
 
-const MIGRATIONS: &[&str] = &[r"
+const MIGRATIONS: &[&str] = &[
+    r"
 CREATE TABLE sync_state (
     resource TEXT PRIMARY KEY,
     synced_at TEXT NOT NULL
@@ -116,7 +117,15 @@ CREATE VIRTUAL TABLE search_index USING fts5(
     detail,
     tokenize = 'unicode61 remove_diacritics 2'
 );
-"];
+",
+    r"
+CREATE TABLE program_notes (
+    handle TEXT PRIMARY KEY,
+    body TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+",
+];
 
 pub(crate) fn run(conn: &mut Connection) -> rusqlite::Result<()> {
     let current: i64 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
@@ -146,5 +155,21 @@ mod tests {
             [],
         )
         .unwrap();
+    }
+
+    #[test]
+    fn upgrades_a_version_one_database_without_losing_data() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        let tx = conn.transaction().unwrap();
+        tx.execute_batch(MIGRATIONS[0]).unwrap();
+        tx.pragma_update(None, "user_version", 1).unwrap();
+        tx.commit().unwrap();
+        conn.execute("INSERT INTO kv (key, value) VALUES ('settings', '{}')", []).unwrap();
+        run(&mut conn).unwrap();
+        let version: i64 = conn.pragma_query_value(None, "user_version", |row| row.get(0)).unwrap();
+        assert_eq!(version, 2);
+        let kept: i64 = conn.query_row("SELECT COUNT(*) FROM kv", [], |row| row.get(0)).unwrap();
+        assert_eq!(kept, 1);
+        conn.execute("INSERT INTO program_notes (handle, body, updated_at) VALUES ('acme', 'n', 't')", []).unwrap();
     }
 }

@@ -23,6 +23,14 @@ impl SecretRegistry {
         }
     }
 
+    /// Registers a standalone secret such as an AI provider key.
+    pub(crate) fn register_value(&self, secret: &str) {
+        let mut secrets = self.0.write().unwrap_or_else(PoisonError::into_inner);
+        if !secret.is_empty() && !secrets.iter().any(|known| known == secret) {
+            secrets.push(secret.to_owned());
+        }
+    }
+
     pub(crate) fn clear(&self) {
         self.0.write().unwrap_or_else(PoisonError::into_inner).clear();
     }
@@ -84,6 +92,15 @@ mod tests {
         assert_eq!(registry.redact(&line), "auth Basic [redacted] token=[redacted]");
         registry.clear();
         assert_eq!(registry.redact("tok-123"), "tok-123");
+    }
+
+    #[test]
+    fn redacts_standalone_values() {
+        let registry = SecretRegistry::default();
+        registry.register_value("sk-standalone-1234");
+        registry.register_value("sk-standalone-1234");
+        registry.register_value("");
+        assert_eq!(registry.redact("key=sk-standalone-1234"), "key=[redacted]");
     }
 
     #[test]

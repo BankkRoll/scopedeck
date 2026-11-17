@@ -1,5 +1,6 @@
 use tauri::State;
 
+use crate::cache::notes::{self, ProgramNote};
 use crate::cache::programs::{ProgramDetail, ProgramRow};
 use crate::cache::search::{SearchHit, SearchKind};
 use crate::cache::{self, Cached, now};
@@ -8,6 +9,7 @@ use crate::state::AppState;
 use crate::sync;
 
 const MAX_SEARCH_RESULTS: u32 = 50;
+const MAX_NOTE_CHARS: usize = 100_000;
 
 fn valid_handle(handle: &str) -> CommandResult<&str> {
     let trimmed = handle.trim();
@@ -50,6 +52,34 @@ pub(crate) fn program_set_pinned(state: State<'_, AppState>, handle: String, pin
     Ok(state.cache.with(|conn| cache::programs::set_pinned(conn, handle, pinned, &now()))?)
 }
 
+fn note_get(state: &AppState, handle: &str) -> CommandResult<Option<ProgramNote>> {
+    let handle = valid_handle(handle)?;
+    Ok(state.cache.with(|conn| notes::note(conn, handle))?)
+}
+
+fn note_save(state: &AppState, handle: &str, body: &str) -> CommandResult<ProgramNote> {
+    let handle = valid_handle(handle)?;
+    if body.chars().count() > MAX_NOTE_CHARS {
+        return Err(CommandError::invalid("notes are limited to 100,000 characters"));
+    }
+    Ok(state.cache.with(|conn| notes::save_note(conn, handle, body))?)
+}
+
+#[tauri::command]
+pub(crate) fn program_note_get(state: State<'_, AppState>, handle: String) -> CommandResult<Option<ProgramNote>> {
+    note_get(&state, &handle)
+}
+
+/// A blank `body` deletes the note and returns `{ body: "", updatedAt }`.
+#[tauri::command]
+pub(crate) fn program_note_save(
+    state: State<'_, AppState>,
+    handle: String,
+    body: String,
+) -> CommandResult<ProgramNote> {
+    note_save(&state, &handle, &body)
+}
+
 #[tauri::command]
 pub(crate) fn local_search(
     state: State<'_, AppState>,
@@ -71,5 +101,19 @@ mod tests {
         assert!(valid_handle("../payments").is_err());
         assert!(valid_handle("a b").is_err());
         assert!(valid_handle("").is_err());
+    }
+
+    #[test]
+    fn notes_are_keyed_by_validated_handle_and_size_limited() {
+        let state = crate::commands::ai::testing::state(None);
+        assert!(note_get(&state, " acme ").unwrap().is_none());
+        assert!(matches!(note_save(&state, "../acme", "x"), Err(CommandError::Invalid { .. })));
+        assert!(matches!(note_get(&state, "a b"), Err(CommandError::Invalid { .. })));
+        let saved = note_save(&state, " acme ", "watch the GraphQL endpoint").unwrap();
+        assert_eq!(note_get(&state, "acme").unwrap(), Some(saved));
+        let too_long = "x".repeat(MAX_NOTE_CHARS + 1);
+        assert!(matches!(note_save(&state, "acme", &too_long), Err(CommandError::Invalid { .. })));
+        assert_eq!(note_save(&state, "acme", "").unwrap().body, "");
+        assert!(note_get(&state, "acme").unwrap().is_none());
     }
 }

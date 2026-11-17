@@ -1,5 +1,6 @@
 pub(crate) mod hacktivity;
 mod migrations;
+pub(crate) mod notes;
 pub(crate) mod payments;
 pub(crate) mod programs;
 pub(crate) mod reports;
@@ -92,7 +93,7 @@ impl Cache {
 }
 
 /// Drops everything fetched from the API while keeping drafts, templates, saved searches,
-/// pins and settings, which only exist locally.
+/// pins, program notes and settings (including AI settings), which only exist locally.
 pub(crate) fn clear_synced_data(conn: &mut Connection) -> Result<(), CacheError> {
     let tx = conn.transaction()?;
     tx.execute_batch(
@@ -106,7 +107,7 @@ pub(crate) fn clear_synced_data(conn: &mut Connection) -> Result<(), CacheError>
          DELETE FROM hacktivity_pages;
          DELETE FROM earnings;
          DELETE FROM payouts;
-         DELETE FROM kv WHERE key <> 'settings';
+         DELETE FROM kv WHERE key NOT IN ('settings', 'ai_settings');
          DELETE FROM search_index;",
     )?;
     tx.commit()?;
@@ -172,5 +173,16 @@ mod tests {
         assert!(path.exists());
         let synced = cache.with(|conn| synced_at(conn, "programs")).unwrap();
         assert!(synced.is_none());
+    }
+
+    #[test]
+    fn clearing_synced_data_keeps_notes_and_ai_settings() {
+        let cache = Cache::in_memory().unwrap();
+        let config = crate::ai::AiConfig { enabled: true, ..crate::ai::AiConfig::default() };
+        cache.with(|conn| workspace::save_ai_config(conn, &config)).unwrap();
+        cache.with(|conn| notes::save_note(conn, "acme", "check /admin")).unwrap();
+        cache.with(clear_synced_data).unwrap();
+        assert_eq!(cache.with(|conn| workspace::ai_config(conn)).unwrap(), config);
+        assert_eq!(cache.with(|conn| notes::note(conn, "acme")).unwrap().unwrap().body, "check /admin");
     }
 }

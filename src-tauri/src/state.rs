@@ -1,9 +1,11 @@
+use std::sync::{Mutex, PoisonError};
 use tokio::sync::RwLock;
 use url::Url;
 
+use crate::ai::AiKey;
 use crate::api::client::ApiClient;
 use crate::cache::Cache;
-use crate::credentials::{CredentialStore, Credentials};
+use crate::credentials::{AiKeyStore, CredentialStore, Credentials};
 use crate::error::{CommandError, CommandResult};
 use crate::redaction::SecretRegistry;
 
@@ -13,6 +15,15 @@ pub(crate) struct AppState {
     pub secrets: SecretRegistry,
     store: Box<dyn CredentialStore>,
     session: RwLock<Option<Session>>,
+    ai_keys: Box<dyn AiKeyStore>,
+    ai_key: Mutex<KeyCache>,
+}
+
+/// Avoids a keychain round trip (and possibly an OS prompt) on every AI call.
+#[derive(Clone)]
+enum KeyCache {
+    Unloaded,
+    Loaded(Option<AiKey>),
 }
 
 #[derive(Clone)]
@@ -22,8 +33,22 @@ struct Session {
 }
 
 impl AppState {
-    pub(crate) fn new(base_url: Url, cache: Cache, store: Box<dyn CredentialStore>, secrets: SecretRegistry) -> Self {
-        Self { base_url, cache, secrets, store, session: RwLock::new(None) }
+    pub(crate) fn new(
+        base_url: Url,
+        cache: Cache,
+        store: Box<dyn CredentialStore>,
+        ai_keys: Box<dyn AiKeyStore>,
+        secrets: SecretRegistry,
+    ) -> Self {
+        Self {
+            base_url,
+            cache,
+            secrets,
+            store,
+            session: RwLock::new(None),
+            ai_keys,
+            ai_key: Mutex::new(KeyCache::Unloaded),
+        }
     }
 
     pub(crate) fn client_for(&self, credentials: Credentials) -> CommandResult<ApiClient> {
@@ -62,9 +87,40 @@ impl AppState {
         Ok(())
     }
 
+    /// Loads the AI provider key, registering it for log redaction before anyone can use it.
+    pub(crate) fn ai_key(&self) -> CommandResult<Option<AiKey>> {
+        let mut cached = self.ai_key.lock().unwrap_or_else(PoisonError::into_inner);
+        if let KeyCache::Loaded(key) = &*cached {
+            return Ok(key.clone());
+        }
+        let raw = self.ai_keys.load()?;
+        if let Some(raw) = &raw {
+            self.secrets.register_value(raw.trim());
+        }
+        let key = raw.and_then(|raw| AiKey::parse(&raw).ok());
+        *cached = KeyCache::Loaded(key.clone());
+        Ok(key)
+    }
+
+    /// Replaces (`Some`) or removes (`None`) the AI provider key in the keychain.
+    pub(crate) fn set_ai_key(&self, key: Option<AiKey>) -> CommandResult<()> {
+        let mut cached = self.ai_key.lock().unwrap_or_else(PoisonError::into_inner);
+        match &key {
+            Some(key) => {
+                self.secrets.register_value(key.expose());
+                self.ai_keys.save(key.expose())?;
+            }
+            None => self.ai_keys.clear()?,
+        }
+        *cached = KeyCache::Loaded(key);
+        Ok(())
+    }
+
+    /// Signing out removes every secret and all local data, including the AI provider key.
     pub(crate) async fn sign_out(&self) -> CommandResult<()> {
         *self.session.write().await = None;
         self.store.clear()?;
+        self.set_ai_key(None)?;
         self.secrets.clear();
         self.cache.wipe()?;
         Ok(())

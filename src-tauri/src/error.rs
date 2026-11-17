@@ -1,5 +1,6 @@
 use serde::Serialize;
 
+use crate::ai::AiError;
 use crate::api::error::ApiError;
 use crate::api::reports::NewReportError;
 use crate::cache::CacheError;
@@ -24,6 +25,18 @@ pub(crate) enum CommandError {
     File { message: String },
     #[error("{message}")]
     Update { message: String },
+    /// `message` duplicates the `Display` of `error` so generic UI can show it without a lookup.
+    #[error("{message}")]
+    Ai { error: AiError, message: String },
+}
+
+impl From<AiError> for CommandError {
+    fn from(error: AiError) -> Self {
+        match error {
+            AiError::InvalidConfig { message } => Self::Invalid { message },
+            other => Self::Ai { message: other.to_string(), error: other },
+        }
+    }
 }
 
 impl From<ApiError> for CommandError {
@@ -76,5 +89,20 @@ mod tests {
         assert_eq!(value, serde_json::json!({ "kind": "api", "error": { "kind": "unauthorized", "detail": null } }));
         let value = serde_json::to_value(CommandError::NotSignedIn).unwrap();
         assert_eq!(value, serde_json::json!({ "kind": "notSignedIn" }));
+    }
+
+    #[test]
+    fn nests_ai_errors_with_a_message_and_flattens_config_errors() {
+        let value = serde_json::to_value(CommandError::from(AiError::Disabled)).unwrap();
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "kind": "ai",
+                "error": { "kind": "disabled" },
+                "message": "AI assistance is turned off; enable it in Settings",
+            })
+        );
+        let value = serde_json::to_value(CommandError::from(AiError::invalid("bad url"))).unwrap();
+        assert_eq!(value, serde_json::json!({ "kind": "invalid", "message": "bad url" }));
     }
 }
