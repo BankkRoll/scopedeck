@@ -1,36 +1,123 @@
-import { Check, Copy } from "lucide-react";
-import { useId, useState } from "react";
+import { DropdownMenu } from "radix-ui";
+import { Check, ChevronDown, ChevronRight, Copy, Download } from "lucide-react";
+import { useId, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { describeError, toAppError } from "@/ipc/errors";
 import type { ScopeRow } from "@/ipc/programs";
+import { saveTextFile } from "@/ipc/system";
 import { EmptyState, SeverityLabel } from "@/components/status";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
+import { itemClass, popoverClass } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { assetTypeLabel } from "@/domain/format";
 import { cn } from "@/lib/cn";
-import { groupByAssetType, scopeExport, submittableScopes } from "@/domain/scope-eligibility";
+import {
+  RECON_FORMATS,
+  groupByAssetType,
+  reconExport,
+  submittableScopes,
+  type ReconFormatInfo,
+} from "@/domain/scope-eligibility";
 
-function CopyButton({ label, text }: { label: string; text: () => string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <Button
-      size="sm"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text());
-          setCopied(true);
-          window.setTimeout(() => {
-            setCopied(false);
-          }, 1500);
-        } catch {
-          toast.error("The clipboard is unavailable");
-        }
-      }}
+interface ExportOutput {
+  format: ReconFormatInfo;
+  text: string;
+}
+
+async function copyExport({ format, text }: ExportOutput) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success(`Copied ${format.label.toLowerCase()}`);
+  } catch {
+    toast.error("The clipboard is unavailable");
+  }
+}
+
+async function saveExport({ format, text }: ExportOutput) {
+  const name = `scope-${format.id}.${format.extension}`;
+  try {
+    if (await saveTextFile(name, format.extension, text)) toast.success(`Saved ${name}`);
+  } catch (error) {
+    toast.error(describeError(toAppError(error)).title);
+  }
+}
+
+function ExportItems({
+  outputs,
+  onPick,
+}: {
+  outputs: readonly ExportOutput[];
+  onPick: (output: ExportOutput) => Promise<void>;
+}) {
+  return outputs.map((output) => (
+    <DropdownMenu.Item
+      key={output.format.id}
+      disabled={output.text === ""}
+      onSelect={() => void onPick(output)}
+      className={itemClass}
     >
-      {copied ? <Check /> : <Copy />}
-      {label}
-    </Button>
+      {output.format.label}
+      <span className="ml-auto pl-6 text-[12px] text-faint">{output.format.hint}</span>
+    </DropdownMenu.Item>
+  ));
+}
+
+const menuClass = cn(popoverClass, "min-w-60 p-1");
+
+/** Mounted only while the menu is open, so exports are built on demand rather than per render. */
+function ExportContent({
+  visible,
+  matching,
+}: {
+  visible: readonly ScopeRow[];
+  matching: readonly ScopeRow[];
+}) {
+  const outputs = useMemo(
+    () =>
+      RECON_FORMATS.map((format) => ({
+        format,
+        // NOTE: Tool formats read `matching` (search only, not the eligibility switch) so Burp
+        // can still emit exclude rules for out-of-scope assets the panel is hiding.
+        text: reconExport(format.id === "plain" || format.id === "json" ? visible : matching, format.id),
+      })),
+    [visible, matching],
+  );
+  return (
+    <DropdownMenu.Content align="end" sideOffset={4} className={menuClass}>
+      <DropdownMenu.Label className="px-2 pt-1 pb-0.5 text-[12px] text-faint">Copy</DropdownMenu.Label>
+      <ExportItems outputs={outputs} onPick={copyExport} />
+      <DropdownMenu.Separator className="-mx-1 my-1 h-px bg-line" />
+      <DropdownMenu.Sub>
+        <DropdownMenu.SubTrigger className={cn(itemClass, "data-[state=open]:bg-hover")}>
+          Save as file…
+          <ChevronRight className="ml-auto size-3.5 text-faint" />
+        </DropdownMenu.SubTrigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.SubContent sideOffset={6} className={menuClass}>
+            <ExportItems outputs={outputs} onPick={saveExport} />
+          </DropdownMenu.SubContent>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Sub>
+    </DropdownMenu.Content>
+  );
+}
+
+function ExportMenu(props: { visible: readonly ScopeRow[]; matching: readonly ScopeRow[] }) {
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <Button size="sm">
+          <Download />
+          Export
+          <ChevronDown className="text-faint" />
+        </Button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <ExportContent {...props} />
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }
 
@@ -69,16 +156,28 @@ function CopyAsset({ value }: { value: string }) {
 
 const ROW_GRID = "grid grid-cols-[minmax(0,1fr)_130px_120px_120px] items-start gap-4 px-5";
 
+/**
+ * A program's structured scope grouped by asset type, with search, an eligibility switch and an
+ * export menu for recon tooling.
+ */
 export function ScopePanel({ scopes }: { scopes: ScopeRow[] }) {
   const switchId = useId();
   const [onlySubmittable, setOnlySubmittable] = useState(true);
   const [query, setQuery] = useState("");
   const needle = query.trim().toLowerCase();
-  const visible = (onlySubmittable ? submittableScopes(scopes) : scopes).filter(
-    (scope) =>
-      !needle ||
-      scope.assetIdentifier.toLowerCase().includes(needle) ||
-      (scope.instruction ?? "").toLowerCase().includes(needle),
+  const matching = useMemo(
+    () =>
+      scopes.filter(
+        (scope) =>
+          !needle ||
+          scope.assetIdentifier.toLowerCase().includes(needle) ||
+          (scope.instruction ?? "").toLowerCase().includes(needle),
+      ),
+    [scopes, needle],
+  );
+  const visible = useMemo(
+    () => (onlySubmittable ? submittableScopes(matching) : matching),
+    [matching, onlySubmittable],
   );
   const groups = groupByAssetType(visible);
   const changed = scopes.filter((scope) => scope.changedSinceLastSync).length;
@@ -106,8 +205,7 @@ export function ScopePanel({ scopes }: { scopes: ScopeRow[] }) {
           <Badge className="border-accent/50 text-link">{changed} new since last sync</Badge>
         ) : null}
         <div className="ml-auto flex gap-2">
-          <CopyButton label="Copy list" text={() => scopeExport(visible, "plain")} />
-          <CopyButton label="Copy JSON" text={() => scopeExport(visible, "json")} />
+          <ExportMenu visible={visible} matching={matching} />
         </div>
       </div>
       {groups.length === 0 ? (

@@ -1,12 +1,13 @@
 import {
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
+  Columns3,
   LayoutGrid,
   List,
   Search,
   SlidersHorizontal,
 } from "lucide-react";
-import { useCallback, useRef, type ReactNode } from "react";
+import { useCallback, useRef, type ComponentType, type ReactNode } from "react";
 import { useViewAction } from "@/features/shell/view-actions";
 import type { SortState, ViewMode } from "@/lib/view-state";
 import { cn } from "@/lib/cn";
@@ -26,17 +27,30 @@ export interface ViewToolbarProps {
     onChange: (value: SortState) => void;
   };
   filters?: { activeCount: number; onOpen: () => void };
-  view?: { mode: ViewMode; onChange: (mode: ViewMode) => void };
+  view?: {
+    mode: ViewMode;
+    onChange: (mode: ViewMode) => void;
+    /** Layouts offered, in order. Defaults to cards and list; only some pages support a board. */
+    modes?: readonly ViewMode[];
+  };
   /** Extra controls placed between search and the right-hand group. */
   children?: ReactNode;
 }
+
+const DEFAULT_MODES: readonly ViewMode[] = ["cards", "list"];
+
+const MODE_BUTTONS: Record<ViewMode, { label: string; icon: ComponentType<{ className?: string }> }> = {
+  cards: { label: "Card view", icon: LayoutGrid },
+  list: { label: "List view", icon: List },
+  board: { label: "Board view", icon: Columns3 },
+};
 
 const segment =
   "grid size-7 place-items-center rounded-[5px] text-faint transition-colors hover:text-ink aria-pressed:bg-raised aria-pressed:text-ink";
 
 /**
  * The toolbar every data page shares: search on the left; sort, filters and the list/cards
- * toggle on the right, always in the same order so muscle memory carries between pages.
+ * layout toggle on the right, always in the same order so muscle memory carries between pages.
  */
 export function ViewToolbar({ search, sort, filters, view, children }: ViewToolbarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
@@ -118,28 +132,24 @@ export function ViewToolbar({ search, sort, filters, view, children }: ViewToolb
             aria-label="Layout"
             className="flex rounded-md border border-line bg-surface p-0.5"
           >
-            <button
-              type="button"
-              aria-label="Card view"
-              aria-pressed={view.mode === "cards"}
-              onClick={() => {
-                view.onChange("cards");
-              }}
-              className={segment}
-            >
-              <LayoutGrid className="size-3.5" />
-            </button>
-            <button
-              type="button"
-              aria-label="List view"
-              aria-pressed={view.mode === "list"}
-              onClick={() => {
-                view.onChange("list");
-              }}
-              className={segment}
-            >
-              <List className="size-3.5" />
-            </button>
+            {(view.modes ?? DEFAULT_MODES).map((mode) => {
+              const { label, icon: Icon } = MODE_BUTTONS[mode];
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-label={label}
+                  title={label}
+                  aria-pressed={view.mode === mode}
+                  onClick={() => {
+                    view.onChange(mode);
+                  }}
+                  className={segment}
+                >
+                  <Icon className="size-3.5" />
+                </button>
+              );
+            })}
           </div>
         ) : null}
       </div>

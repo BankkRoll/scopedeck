@@ -1,5 +1,5 @@
 import { ArrowUpRight, Download } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { describeError, toAppError } from "@/ipc/errors";
@@ -26,6 +26,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toCsv } from "@/domain/csv";
 import { hackerOne } from "@/domain/deep-links";
 import {
+  bountyStats,
+  earningsByKind,
   earningsByMonth,
   earningsByProgram,
   earningsByYear,
@@ -33,9 +35,12 @@ import {
   lastMonths,
   payoutsCsvRows,
   totalAmount,
+  yearOverYear,
   type Total,
+  type YearOverYear,
 } from "@/domain/earnings";
 import { formatDate, formatMoney, humanize } from "@/domain/format";
+import { cn } from "@/lib/cn";
 import { columnHelper } from "@/lib/table";
 import { ProgramLabel } from "@/features/programs/program-label";
 import { useProgramLookup } from "@/features/programs/use-programs";
@@ -106,12 +111,41 @@ const payoutColumns = payoutHelper.columns([
   }),
 ]);
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  detail,
+  className,
+}: {
+  label: string;
+  value: string;
+  detail?: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="flex flex-col gap-1 border-r border-line px-5 py-4 last:border-r-0">
+    <div
+      className={cn("flex min-w-0 flex-col gap-1 border-r border-line px-5 py-4 last:border-r-0", className)}
+    >
       <span className="text-[13px] text-faint">{label}</span>
       <span className="font-mono text-[22px] leading-7 tracking-tight tabular-nums">{value}</span>
+      {detail ? <span className="truncate text-[12px] text-faint">{detail}</span> : null}
     </div>
+  );
+}
+
+function YearOverYearDetail({ comparison }: { comparison: YearOverYear }) {
+  const { deltaPercent, lastYear, year } = comparison;
+  const previous = `${formatMoney(lastYear)} by this date in ${String(year - 1)}`;
+  if (deltaPercent === null) return <>Nothing by this date in {year - 1}</>;
+  const rounded = Math.round(deltaPercent);
+  return (
+    <>
+      <span className={cn("font-mono", rounded > 0 && "text-success", rounded < 0 && "text-danger")}>
+        {rounded > 0 ? "+" : ""}
+        {rounded}%
+      </span>{" "}
+      vs {previous}
+    </>
   );
 }
 
@@ -225,6 +259,9 @@ export function EarningsPage() {
   const months = useMemo(() => lastMonths(earningsByMonth(earnings), 12, new Date()), [earnings]);
   const years = useMemo(() => earningsByYear(earnings).reverse(), [earnings]);
   const programs = useMemo(() => earningsByProgram(earnings), [earnings]);
+  const kinds = useMemo(() => earningsByKind(earnings), [earnings]);
+  const comparison = useMemo(() => yearOverYear(earnings, new Date()), [earnings]);
+  const bounties = useMemo(() => bountyStats(earnings), [earnings]);
   const programHandles = useMemo(
     () => [...new Set(all.map((earning) => earning.programHandle ?? "").filter(Boolean))].sort(),
     [all],
@@ -341,10 +378,38 @@ export function EarningsPage() {
         <Stat label="Paid out" value={formatMoney(totalAmount(payouts))} />
         <Stat label={filtered ? "Events (filtered)" : "Earning events"} value={String(earnings.length)} />
       </div>
-      <div className="grid shrink-0 grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-8 border-b border-line px-5 py-4">
+      <div className="grid shrink-0 grid-cols-4 border-b border-line">
+        <Stat
+          label={`${String(comparison.year)} to date`}
+          value={formatMoney(comparison.thisYear)}
+          detail={<YearOverYearDetail comparison={comparison} />}
+          className="col-span-2"
+        />
+        <Stat
+          label="Average bounty"
+          value={bounties.average === null ? "–" : formatMoney(bounties.average)}
+          detail={`${bounties.count.toLocaleString()} ${bounties.count === 1 ? "bounty" : "bounties"}`}
+        />
+        <Stat
+          label="Largest bounty"
+          value={bounties.largest ? formatMoney(bounties.largest.amount) : "–"}
+          detail={
+            bounties.largest
+              ? [
+                  bounties.largest.programName ?? bounties.largest.programHandle,
+                  bounties.largest.reportId ? `#${bounties.largest.reportId}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || undefined
+              : undefined
+          }
+        />
+      </div>
+      <div className="grid shrink-0 grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-8 border-b border-line px-5 py-4">
         <BarChart data={months} title="Last 12 months" />
         <TotalsList title="By year" totals={years} />
         <TotalsList title="By program" totals={programs} />
+        <TotalsList title="By type" totals={kinds} />
       </div>
       <Tabs defaultValue="earnings" className="flex min-h-0 flex-1 flex-col">
         <TabsList className="items-center">
