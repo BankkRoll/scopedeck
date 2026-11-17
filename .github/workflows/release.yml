@@ -28,16 +28,25 @@ jobs:
             exit 1
           fi
       # Creating the draft once up front lets the platform builds attach to the same release.
-      # Drafts cannot be looked up by tag, so each build would otherwise create its own.
+      # The id comes straight from the create response: listing releases right after creating
+      # one can miss the new draft, which silently skipped every upload.
       - name: Create a draft release
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --draft --verify-tag --generate-notes \
-            --title "Scopedeck ${GITHUB_REF_NAME#v}"
-          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" \
-            --jq ".[] | select(.tag_name == \"$GITHUB_REF_NAME\") | .id")
+          notes="docs/releases/$GITHUB_REF_NAME.md"
+          args=(-f tag_name="$GITHUB_REF_NAME" -f name="Scopedeck ${GITHUB_REF_NAME#v}" -F draft=true)
+          if [ -f "$notes" ]; then
+            args+=(-f body="$(cat "$notes")")
+          else
+            args+=(-F generate_release_notes=true)
+          fi
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" "${args[@]}" --jq .id)
+          if [ -z "$id" ]; then
+            echo "::error::Could not create the draft release"
+            exit 1
+          fi
           echo "id=$id" >> "$GITHUB_OUTPUT"
 
   build:
