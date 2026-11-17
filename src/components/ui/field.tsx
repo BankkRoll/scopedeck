@@ -1,27 +1,17 @@
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
-const control =
+/** Base style shared by text inputs and dropdown triggers. */
+export const controlClass =
   "w-full rounded-md border border-line bg-raised text-[13px] text-ink placeholder:text-faint transition-colors hover:border-line-strong focus-visible:border-focus focus-visible:outline-none aria-invalid:border-danger disabled:opacity-50";
 
 export function Input({ className, ...props }: ComponentProps<"input">) {
-  return <input className={cn(control, "h-8 px-2.5", className)} {...props} />;
+  return <input className={cn(controlClass, "h-8 px-2.5", className)} {...props} />;
 }
 
 export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
   return (
-    <textarea className={cn(control, "min-h-24 resize-y px-2.5 py-2 leading-5", className)} {...props} />
-  );
-}
-
-export function Select({ className, children, ...props }: ComponentProps<"select">) {
-  return (
-    <select
-      className={cn(control, "h-8 appearance-none bg-no-repeat pr-7 pl-2.5", "select-chevron", className)}
-      {...props}
-    >
-      {children}
-    </select>
+    <textarea className={cn(controlClass, "min-h-24 resize-y px-2.5 py-2 leading-5", className)} {...props} />
   );
 }
 
