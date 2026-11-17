@@ -15,6 +15,8 @@ import { Switch } from "@/components/ui/switch";
 import { hackerOne } from "@/domain/deep-links";
 import { CredentialForm } from "@/features/auth/onboarding";
 import { queryKeys } from "@/query/keys";
+import { useAiSettings } from "./ai-config";
+import { AiSettingsForm } from "./ai-settings";
 import { useSettings } from "./use-settings";
 
 function Section({
@@ -100,6 +102,7 @@ export function SettingsPage() {
       queryClient.setQueryData(queryKeys.auth, { username: null });
     },
   });
+  const ai = useAiSettings();
   const update = useQuery({ queryKey: queryKeys.update, queryFn: updateCheck, enabled: false, retry: false });
   const install = useMutation({ mutationFn: updateInstall });
 
@@ -153,6 +156,14 @@ export function SettingsPage() {
               Clear cache
             </Button>
           </Row>
+        </Section>
+
+        <Section
+          title="Report assistant"
+          description="Optional. Drafts reports from your notes, checks them against the program policy and rewrites sections. Use a hosted model with your own key, or a local one through Ollama."
+        >
+          {ai.data ? <AiSettingsForm key={ai.dataUpdatedAt} settings={ai.data} /> : null}
+          {ai.isError ? <ErrorNotice error={toAppError(ai.error)} /> : null}
         </Section>
 
         <Section

@@ -33,4 +33,6 @@ export const queryKeys = {
   templates: ["templates"] as const,
   savedSearches: ["saved-searches"] as const,
   update: ["update"] as const,
+  aiSettings: ["ai-settings"] as const,
+  programNote: (handle: string) => ["program-note", handle] as const,
 };

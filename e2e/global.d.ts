@@ -9,5 +9,6 @@ interface Window {
     payouts: Record<string, unknown>[];
     intents: Record<string, unknown>[];
     balance: number;
+    ai: Record<string, unknown>;
   };
 }

@@ -134,6 +134,8 @@ interface MockState {
   earnings: Json[];
   payouts: Json[];
   intents: Json[];
+  ai: Json;
+  notes: Map<string, Json>;
 }
 
 function initialState(): MockState {
@@ -177,6 +179,8 @@ function initialState(): MockState {
     earnings: EARNINGS,
     payouts: PAYOUTS,
     intents: [],
+    ai: { provider: "anthropic", model: "claude-sonnet-5-5", baseUrl: null, enabled: false, hasKey: false },
+    notes: new Map(),
   };
 }
 
@@ -195,6 +199,46 @@ const text = (payload: InvokeArgs | undefined, key: string) => {
   return typeof value === "string" ? value : "";
 };
 const object = (payload: InvokeArgs | undefined, key: string) => (field(payload, key) ?? {}) as Json;
+
+/** Canned, deterministic assistant replies keyed off the prompt format the app sends. */
+function mockCompletion(system: string, prompt: string): string {
+  if (system.includes('"findings"')) {
+    return JSON.stringify({
+      findings: [
+        {
+          level: "warning",
+          message:
+            "The policy asks for IDOR reports to use two accounts you own. Say in the steps that both tenants are test accounts you created.",
+        },
+        {
+          level: "note",
+          message:
+            "Clickjacking is excluded, but this report is an access control issue, so the exclusion does not apply.",
+        },
+      ],
+    });
+  }
+  if (system.includes('"titles"')) {
+    return JSON.stringify({
+      titles: [
+        "Stored XSS in profile bio runs script in admin user list",
+        "Unescaped profile bio allows account takeover of administrators",
+        "HTML injection in bio field executes JavaScript for staff viewers",
+      ],
+    });
+  }
+  if (system.includes('"vulnerabilityInformation"')) {
+    return JSON.stringify({
+      title: "Stored XSS in profile bio runs script in the admin user list",
+      severity: "high",
+      vulnerabilityInformation:
+        "## Summary\n\nThe bio field on /settings/profile is rendered without escaping in the admin user list.\n\n## Steps to reproduce\n\n1. Sign in as a regular user.\n2. Set the bio to `<img src=x onerror=alert(document.domain)>`.\n3. Sign in as an administrator and open /admin/users.\n\n## Proof of concept\n\nThe alert fires on page load.",
+      impact:
+        "Any user can run JavaScript in an administrator session and act as that administrator, including changing roles and reading customer data.",
+    });
+  }
+  return prompt.split("Text:\n").at(-1)?.trim() ?? "";
+}
 
 function handle(state: MockState, command: string, payload: InvokeArgs | undefined): unknown {
   switch (command) {
@@ -357,6 +401,38 @@ function handle(state: MockState, command: string, payload: InvokeArgs | undefin
       return state.settings;
     case "open_external":
       return null;
+    case "ai_settings_get":
+      return state.ai;
+    case "ai_settings_save": {
+      const apiKey = field(payload, "apiKey");
+      const hasKey = typeof apiKey === "string" ? apiKey.trim().length > 0 : Boolean(state.ai.hasKey);
+      state.ai = {
+        provider: field(payload, "provider"),
+        model: text(payload, "model") || "claude-sonnet-5-5",
+        baseUrl: field(payload, "baseUrl") ?? null,
+        enabled: Boolean(field(payload, "enabled")),
+        hasKey,
+      };
+      return state.ai;
+    }
+    case "ai_test":
+      return { ok: true, model: state.ai.model, latencyMs: 412 };
+    case "ai_complete":
+      if (!state.ai.enabled)
+        throw {
+          kind: "ai",
+          error: { kind: "disabled" },
+          message: "AI assistance is turned off; enable it in Settings",
+        };
+      return { text: mockCompletion(text(payload, "system"), text(payload, "prompt")) };
+    case "program_note_get":
+      return state.notes.get(text(payload, "handle")) ?? null;
+    case "program_note_save": {
+      const note = { body: text(payload, "body"), updatedAt: NOW };
+      if (note.body.trim()) state.notes.set(text(payload, "handle"), note);
+      else state.notes.delete(text(payload, "handle"));
+      return note;
+    }
     case "plugin:event|listen":
       return 1;
     case "plugin:event|unlisten":

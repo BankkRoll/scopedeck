@@ -96,6 +96,54 @@ test("imports a finding from JSON and flags fields it cannot match", async ({ si
   await expect(page.getByPlaceholder("Report title")).toHaveValue("SSRF via webhook URL");
 });
 
+test("scores CVSS into the report and drafts with the assistant after consent", async ({
+  signedIn: page,
+}) => {
+  await page.evaluate(() => {
+    if (window.__mockBackend)
+      window.__mockBackend.ai = { ...window.__mockBackend.ai, enabled: true, hasKey: true };
+  });
+  await page.getByRole("link", { name: "New report" }).click();
+  await pick(page, "Program", "Acme Corp");
+
+  await page.getByRole("button", { name: "CVSS calculator" }).click();
+  const cvss = page.getByRole("dialog", { name: "CVSS 3.1 calculator" });
+  const metrics = [
+    ["Attack vector", "Network"],
+    ["Attack complexity", "Low"],
+    ["Privileges required", "None"],
+    ["User interaction", "None"],
+    ["Scope", "Unchanged"],
+    ["Confidentiality", "High"],
+    ["Integrity", "High"],
+    ["Availability", "High"],
+  ] as const;
+  for (const [metric, choice] of metrics) {
+    await cvss
+      .getByRole("radiogroup", { name: metric })
+      .getByRole("radio", { name: choice, exact: true })
+      .click();
+  }
+  await expect(cvss.getByText("9.8")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("radio", { name: "Critical" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("textbox", { name: "Vulnerability information" })).toContainText(
+    "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+  );
+
+  await page.getByRole("button", { name: "Assistant" }).click();
+  const assistant = page.getByRole("dialog", { name: "Assistant" });
+  await expect(assistant.getByText(/forbid sharing/)).toBeVisible();
+  await assistant.getByRole("button", { name: "Allow for Acme Corp" }).click();
+  await assistant.getByLabel("Notes").fill("bio renders html, img onerror fires for admins");
+  await assistant.getByRole("button", { name: "Write draft" }).click();
+  await assistant.getByRole("button", { name: "Apply" }).click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByPlaceholder("Report title")).toHaveValue(
+    "Stored XSS in profile bio runs script in the admin user list",
+  );
+});
+
 test("opens a report with its activity timeline", async ({ signedIn: page }) => {
   await page.getByRole("link", { name: "Reports" }).click();
   await page

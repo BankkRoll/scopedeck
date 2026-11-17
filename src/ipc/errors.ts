@@ -16,6 +16,20 @@ const apiErrorSchema = z.discriminatedUnion("kind", [
 
 export type ApiError = z.infer<typeof apiErrorSchema>;
 
+const aiErrorSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("disabled") }),
+  z.object({ kind: z.literal("missingKey") }),
+  z.object({ kind: z.literal("unauthorized") }),
+  z.object({ kind: z.literal("rateLimited"), retryAfterSecs: z.number().nullable() }),
+  z.object({ kind: z.literal("server"), status: z.number() }),
+  z.object({ kind: z.literal("rejected"), status: z.number(), message: z.string().nullable() }),
+  z.object({ kind: z.literal("network"), message: z.string() }),
+  z.object({ kind: z.literal("decode"), message: z.string() }),
+]);
+
+/** Why a request to the AI provider failed. */
+export type AiError = z.infer<typeof aiErrorSchema>;
+
 export const commandErrorSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("api"), error: apiErrorSchema }),
   z.object({ kind: z.literal("notSignedIn") }),
@@ -25,6 +39,7 @@ export const commandErrorSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("notFound"), message: z.string() }),
   z.object({ kind: z.literal("file"), message: z.string() }),
   z.object({ kind: z.literal("update"), message: z.string() }),
+  z.object({ kind: z.literal("ai"), error: aiErrorSchema, message: z.string() }),
 ]);
 
 export type AppError =
@@ -107,6 +122,35 @@ function describeApiError(error: ApiError): ErrorDescription {
   }
 }
 
+function describeAiError(error: AiError, message: string): ErrorDescription {
+  switch (error.kind) {
+    case "disabled":
+    case "missingKey":
+      return { title: capitalize(message), detail: "Open Settings, AI assistant." };
+    case "unauthorized":
+      return { title: "The AI provider rejected the API key" };
+    case "rateLimited":
+      return {
+        title: "The AI provider is rate limiting requests",
+        detail: error.retryAfterSecs === null ? undefined : `Try again in ${error.retryAfterSecs} seconds.`,
+      };
+    case "server":
+      return {
+        title: `The AI provider returned a server error (${error.status})`,
+        detail: "Try again shortly.",
+      };
+    case "rejected":
+      return {
+        title: `The AI provider refused the request (${error.status})`,
+        detail: error.message ?? undefined,
+      };
+    case "network":
+      return { title: "Could not reach the AI provider", detail: error.message };
+    case "decode":
+      return { title: "The AI provider sent a reply this version cannot read", detail: error.message };
+  }
+}
+
 export function describeError(error: AppError): ErrorDescription {
   switch (error.kind) {
     case "api":
@@ -125,6 +169,8 @@ export function describeError(error: AppError): ErrorDescription {
       return { title: capitalize(error.message) };
     case "update":
       return { title: "The update failed", detail: error.message };
+    case "ai":
+      return describeAiError(error.error, error.message);
     case "contract":
       return {
         title: `The app received unexpected data from ${error.command}`,

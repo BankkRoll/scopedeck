@@ -11,6 +11,7 @@ import { hackerOne } from "@/domain/deep-links";
 import { formatDate, formatMoney, humanize } from "@/domain/format";
 import { cn } from "@/lib/cn";
 import { useViewAction } from "@/features/shell/view-actions";
+import { NotesPanel } from "./notes-panel";
 import { ScopePanel } from "./scope-panel";
 import { usePinProgram, useProgram } from "./use-programs";
 
@@ -124,6 +125,7 @@ export function ProgramPage() {
             Weaknesses <span className="font-mono text-faint">{detail.data?.weaknesses.length ?? 0}</span>
           </TabsTrigger>
           <TabsTrigger value="policy">Policy</TabsTrigger>
+          <TabsTrigger value="notes">Notes</TabsTrigger>
         </TabsList>
         <TabsContent value="scope">
           {detail.data ? <ScopePanel scopes={detail.data.scopes} /> : <EmptyState title="Loading scope" />}
@@ -164,6 +166,9 @@ export function ProgramPage() {
           ) : (
             <EmptyState title="No policy text">The API returned no policy for this program.</EmptyState>
           )}
+        </TabsContent>
+        <TabsContent value="notes" className="flex min-h-0 flex-col overflow-hidden">
+          <NotesPanel handle={handle} />
         </TabsContent>
       </Tabs>
     </>
