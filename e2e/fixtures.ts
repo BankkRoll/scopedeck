@@ -2,8 +2,8 @@ import { expect, test as base, type Page } from "@playwright/test";
 
 export async function signIn(page: Page): Promise<void> {
   await page.goto("/");
-  await page.getByLabel("Token identifier").fill("researcher");
-  await page.getByLabel("Token value").fill("valid-token");
+  await page.getByLabel("HackerOne username").fill("researcher");
+  await page.getByLabel("API token").fill("valid-token");
   await page.getByRole("button", { name: "Connect" }).click();
   await expect(page.getByRole("heading", { name: "Programs" })).toBeVisible();
 }

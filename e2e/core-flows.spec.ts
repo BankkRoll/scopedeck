@@ -3,8 +3,8 @@ import { expect, signIn, test } from "./fixtures";
 test("onboarding rejects bad credentials, then connects with a valid token", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Connect your HackerOne API token" })).toBeVisible();
-  await page.getByLabel("Token identifier").fill("researcher");
-  await page.getByLabel("Token value").fill("wrong-token");
+  await page.getByLabel("HackerOne username").fill("researcher");
+  await page.getByLabel("API token").fill("wrong-token");
   await page.getByRole("button", { name: "Connect" }).click();
   await expect(page.getByRole("alert")).toContainText("HackerOne rejected your API credentials");
 

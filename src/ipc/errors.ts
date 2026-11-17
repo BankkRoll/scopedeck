@@ -70,7 +70,7 @@ function describeApiError(error: ApiError): ErrorDescription {
         title: "HackerOne rejected your API credentials",
         detail:
           error.detail ??
-          "Check the token identifier and value, or generate a new token on HackerOne. Tokens are revoked when regenerated.",
+          "Check your username and API token, or generate a new token on HackerOne. Tokens are revoked when regenerated.",
       };
     case "forbidden":
       return {

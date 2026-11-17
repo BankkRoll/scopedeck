@@ -60,7 +60,7 @@ update installs only when you confirm it and its signature verifies.
 ### Connect your account
 
 1. Create an API token on hackerone.com under **Settings → API token**.
-2. Open Scopedeck and enter the token identifier (your username) and the token value.
+2. Open Scopedeck and enter your HackerOne username and the token.
 
 Scopedeck verifies the token with one read request and stores it in your operating system's
 keychain.

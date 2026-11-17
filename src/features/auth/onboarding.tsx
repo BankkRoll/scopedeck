@@ -40,9 +40,9 @@ export function CredentialForm({ submitLabel, onSignedIn }: CredentialFormProps)
       noValidate
     >
       <Field
-        label="Token identifier"
+        label="HackerOne username"
         htmlFor={usernameId}
-        hint="Shown as the identifier next to your API token."
+        hint="The name in your profile URL. HackerOne calls this the token identifier."
       >
         <Input
           id={usernameId}
@@ -56,7 +56,7 @@ export function CredentialForm({ submitLabel, onSignedIn }: CredentialFormProps)
           autoFocus
         />
       </Field>
-      <Field label="Token value" htmlFor={tokenId} hint="Stored in your system keychain, never on disk.">
+      <Field label="API token" htmlFor={tokenId} hint="Stored in your system keychain, never on disk.">
         <Input
           id={tokenId}
           name="token"
@@ -94,7 +94,7 @@ export function Onboarding() {
         <p className="mt-2 text-[14px] leading-[22px] text-muted">
           Scopedeck talks to the Hacker API with your own token. Create one under{" "}
           <ExternalLink href={hackerOne.apiToken}>Settings, API token</ExternalLink> on HackerOne, then paste
-          the identifier and value here. One read request checks them before anything is saved.
+          it here with your username. One read request checks them before anything is saved.
         </p>
         <div className="mt-6 rounded-lg border border-line bg-surface p-5">
           <CredentialForm submitLabel="Connect" />

@@ -34,13 +34,13 @@ impl Credentials {
         let username = username.trim();
         let token = token.trim();
         if username.is_empty() {
-            return Err(CredentialError::Invalid("enter the API token identifier".into()));
+            return Err(CredentialError::Invalid("enter your HackerOne username".into()));
         }
         if token.is_empty() {
-            return Err(CredentialError::Invalid("enter the API token value".into()));
+            return Err(CredentialError::Invalid("enter your API token".into()));
         }
         if username.chars().any(char::is_whitespace) || token.chars().any(char::is_whitespace) {
-            return Err(CredentialError::Invalid("the identifier and token cannot contain spaces".into()));
+            return Err(CredentialError::Invalid("the username and token cannot contain spaces".into()));
         }
         Ok(Self { username: username.to_owned(), token: ApiToken::new(token) })
     }
