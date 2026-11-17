@@ -61,6 +61,7 @@ const columns = helper.columns([
   }),
   helper.accessor("name", {
     header: "Program",
+    size: 420,
     sortFn: "text",
     cell: (info) => (
       <span className="flex min-w-0 items-center gap-2.5">
