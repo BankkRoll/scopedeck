@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { tableFeatureSet, type Columns } from "@/lib/table";
+import type { SortState } from "@/lib/view-state";
 
 const ROW_HEIGHT = 36;
 
@@ -13,6 +14,11 @@ interface DataTableProps<T extends RowData> {
   getRowId: (row: T, index: number) => string;
   onActivate?: (row: T) => void;
   initialSorting?: SortingState;
+  /** Page-owned sort. When set, rows arrive already sorted and header clicks report here. */
+  sort?: SortState;
+  onSortChange?: (sort: SortState) => void;
+  /** Column ids that map to a toolbar sort; other headers are not clickable when `sort` is set. */
+  sortableIds?: readonly string[];
   empty?: ReactNode;
   label: string;
 }
@@ -23,10 +29,15 @@ export function DataTable<T extends RowData>({
   getRowId,
   onActivate,
   initialSorting = [],
+  sort,
+  onSortChange,
+  sortableIds,
   empty,
   label,
 }: DataTableProps<T>) {
-  const [sorting, setSorting] = useState<SortingState>(initialSorting);
+  const [localSorting, setSorting] = useState<SortingState>(initialSorting);
+  const controlled = sort !== undefined;
+  const sorting: SortingState = controlled ? [{ id: sort.id, desc: sort.desc }] : localSorting;
   const [cursor, setCursor] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const table = useTable({
@@ -36,6 +47,7 @@ export function DataTable<T extends RowData>({
     getRowId: (row, index) => getRowId(row, index),
     state: { sorting },
     onSortingChange: setSorting,
+    manualSorting: controlled,
   });
   const rows = table.getRowModel().rows;
   const virtualizer = useVirtualizer({
@@ -108,7 +120,17 @@ export function DataTable<T extends RowData>({
             <tr key={group.id}>
               {group.headers.map((header) => {
                 const sorted = header.column.getIsSorted();
-                const canSort = header.column.getCanSort();
+                const canSort = controlled
+                  ? (sortableIds ?? []).includes(header.column.id)
+                  : header.column.getCanSort();
+                const toggle = controlled
+                  ? () => {
+                      onSortChange?.({
+                        id: header.column.id,
+                        desc: sort.id === header.column.id ? !sort.desc : true,
+                      });
+                    }
+                  : header.column.getToggleSortingHandler();
                 return (
                   <th
                     key={header.id}
@@ -120,7 +142,7 @@ export function DataTable<T extends RowData>({
                     {header.isPlaceholder ? null : canSort ? (
                       <button
                         type="button"
-                        onClick={header.column.getToggleSortingHandler()}
+                        onClick={toggle}
                         className="inline-flex items-center gap-1 hover:text-ink"
                       >
                         <table.FlexRender header={header} />

@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import { authStatus } from "@/ipc/auth";
 import { toAppError } from "@/ipc/errors";
 import { ErrorNotice } from "@/components/status";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { Onboarding } from "@/features/auth/onboarding";
 import { useApplyTheme } from "@/features/settings/use-theme";
 import { queryKeys } from "@/query/keys";
@@ -30,7 +31,9 @@ export function App() {
   const [queryClient] = useState(createQueryClient);
   return (
     <QueryClientProvider client={queryClient}>
-      <Gate />
+      <TooltipProvider>
+        <Gate />
+      </TooltipProvider>
       <Toaster
         position="bottom-right"
         toastOptions={{

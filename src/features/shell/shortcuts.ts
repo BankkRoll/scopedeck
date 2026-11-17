@@ -11,7 +11,8 @@ export type ShortcutAction =
   | "goSettings"
   | "compose"
   | "search"
-  | "refresh";
+  | "refresh"
+  | "toggleSidebar";
 
 export interface ShortcutDefinition {
   action: ShortcutAction;
@@ -24,6 +25,7 @@ export const MOD_LABEL = isMac ? "⌘" : "Ctrl";
 
 export const SHORTCUTS: ShortcutDefinition[] = [
   { action: "palette", keys: [MOD_LABEL, "K"], label: "Open the command palette" },
+  { action: "toggleSidebar", keys: [MOD_LABEL, "B"], label: "Show or hide the sidebar" },
   { action: "help", keys: ["?"], label: "Show keyboard shortcuts" },
   { action: "search", keys: ["/"], label: "Focus the search field" },
   { action: "refresh", keys: ["R"], label: "Sync the current view" },
@@ -85,6 +87,10 @@ export function useGlobalShortcuts(onAction: (action: ShortcutAction) => void): 
       };
       if (mod && event.key.toLowerCase() === "k") {
         fire("palette");
+        return;
+      }
+      if (mod && event.key.toLowerCase() === "b") {
+        fire("toggleSidebar");
         return;
       }
       if (mod && event.key === ",") {
