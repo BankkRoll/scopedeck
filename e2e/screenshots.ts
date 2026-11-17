@@ -95,19 +95,82 @@ await page.getByText("api.acme.com").waitFor();
 await settle(page);
 await page.screenshot({ path: `${out}/program.png` });
 
+await page.evaluate(() => {
+  const backend = window.__mockBackend;
+  if (backend) backend.ai = { ...backend.ai, enabled: true, hasKey: true };
+});
 await go(page, "#/compose?program=acme");
 await page.getByRole("heading", { name: "New report" }).waitFor();
 await page.getByLabel("Asset", { exact: true }).click();
 await page.getByRole("option", { name: "api.acme.com" }).click();
-await page.getByRole("radio", { name: "High" }).click();
-await page.getByPlaceholder("Report title").fill("IDOR on invoice export");
+await page.getByLabel("Weakness", { exact: true }).click();
+await page.getByRole("option", { name: /Insecure Direct Object Reference/ }).click();
+await page
+  .getByPlaceholder("Report title")
+  .fill("IDOR on /invoices/{id} lets any customer download every other tenant's invoices");
 await page
   .getByRole("textbox", { name: "Vulnerability information" })
   .fill(
-    "## Steps\n\n1. Log in as user A\n2. Request `/invoices/2`\n\n```http\nGET /invoices/2 HTTP/1.1\n```",
+    [
+      "## Summary",
+      "",
+      "The invoice export endpoint checks that the caller is signed in but not that the invoice belongs to their tenant.",
+      "",
+      "## Steps to reproduce",
+      "",
+      "1. Sign in as a customer of tenant A.",
+      "2. Request an invoice that belongs to tenant B:",
+      "",
+      "```http",
+      "GET /v2/invoices/48213/export HTTP/1.1",
+      "Host: api.acme.com",
+      "Authorization: Bearer <tenant A token>",
+      "```",
+      "",
+      "3. The response is tenant B's invoice as a PDF.",
+    ].join("\n"),
   );
+await page.getByRole("tab", { name: "Impact" }).click();
+await page
+  .getByRole("textbox", { name: "Impact" })
+  .fill(
+    "Any customer can enumerate invoice ids and download every other tenant's invoices, which include billing addresses, line items and the last four digits of payment cards.",
+  );
+await page.getByRole("tab", { name: "Vulnerability information" }).click();
+
+await page.getByRole("button", { name: "CVSS calculator" }).click();
+const cvss = page.getByRole("dialog", { name: "CVSS 3.1 calculator" });
+for (const [metric, choice] of [
+  ["Attack vector", "Network"],
+  ["Attack complexity", "Low"],
+  ["Privileges required", "Low"],
+  ["User interaction", "None"],
+  ["Scope", "Unchanged"],
+  ["Confidentiality", "High"],
+  ["Integrity", "None"],
+  ["Availability", "None"],
+] as const) {
+  await cvss
+    .getByRole("radiogroup", { name: metric })
+    .getByRole("radio", { name: choice, exact: true })
+    .click();
+}
+await settle(page);
+await page.screenshot({ path: `${out}/composer-cvss.png` });
+await page.keyboard.press("Escape");
+await page.getByRole("region", { name: "Target" }).scrollIntoViewIfNeeded();
 await settle(page);
 await page.screenshot({ path: `${out}/composer.png` });
+
+await page.getByRole("button", { name: "Assistant" }).click();
+const assistant = page.getByRole("dialog", { name: "Assistant" });
+await assistant.getByRole("button", { name: /^Allow for/ }).click();
+await assistant.getByRole("tab", { name: "Policy check" }).click();
+await assistant.getByRole("button", { name: "Run policy check" }).click();
+await assistant.getByText("No policy problems found").or(assistant.getByRole("listitem").first()).waitFor();
+await settle(page);
+await page.screenshot({ path: `${out}/assistant.png` });
+await page.keyboard.press("Escape");
 
 await go(page, "#/reports/2002");
 await page.getByRole("region", { name: "Activity" }).waitFor();
@@ -118,6 +181,10 @@ await go(page, "#/reports");
 await page.getByText("Stored XSS in invoice notes renders for admins").waitFor();
 await settle(page);
 await page.screenshot({ path: `${out}/reports.png` });
+await page.getByRole("button", { name: "Board view" }).click();
+await settle(page);
+await page.screenshot({ path: `${out}/reports-board.png` });
+await page.getByRole("button", { name: "Card view" }).click();
 
 await go(page, "#/intents");
 await page.getByText("Stored XSS in comment preview").waitFor();
@@ -176,6 +243,12 @@ await page.keyboard.press("Control+b");
 await settle(page);
 await page.screenshot({ path: `${out}/programs-list.png` });
 await page.keyboard.press("Control+b");
+
+await go(page, "#/settings");
+await page.getByRole("heading", { name: "Report assistant" }).waitFor();
+await page.getByRole("heading", { name: "Report assistant" }).scrollIntoViewIfNeeded();
+await settle(page);
+await page.screenshot({ path: `${out}/settings.png` });
 
 await go(page, "#/earnings");
 await page.getByRole("figure", { name: /Last 12 months/ }).waitFor();

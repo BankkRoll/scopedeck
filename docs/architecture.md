@@ -41,23 +41,34 @@ leak or misuse anything if a sanitizer bug ever lets script through.
 
 [`src-tauri/src`](../src-tauri/src)
 
-| Module              | Responsibility                                                                                                                   |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `api/client.rs`     | Basic-auth client, percent-encoded paths, pagination that refuses `links.next` on another origin, multipart uploads              |
-| `api/rate_limit.rs` | Sliding-window limiter per bucket (read, write, structured scopes)                                                               |
-| `api/retry.rs`      | Full-jitter backoff, `Retry-After` as seconds or HTTP date; non-idempotent requests are not retried on 5xx                       |
-| `api/error.rs`      | `ApiError`, a tagged enum mapped from status codes and JSON:API error bodies                                                     |
-| `api/*.rs`          | One module per resource: DTOs and endpoint functions                                                                             |
-| `credentials.rs`    | `CredentialStore` trait with a keychain implementation and an in-memory one for tests                                            |
-| `cache/`            | SQLite in WAL mode, versioned migrations, an FTS5 index over programs and assets, drafts, templates, saved searches and settings |
-| `sync.rs`           | Fetches from the API and writes into the cache; detects scope and report changes                                                 |
-| `background.rs`     | Periodic report sync, change events and opt-in notifications                                                                     |
-| `redaction.rs`      | Registry of secret strings and a `MakeWriter` that scrubs them from every log line                                               |
-| `commands/`         | Thin Tauri command handlers; errors become a tagged `CommandError` the UI can switch on                                          |
+| Module              | Responsibility                                                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api/client.rs`     | Basic-auth client, percent-encoded paths, pagination that refuses `links.next` on another origin, multipart uploads                         |
+| `api/rate_limit.rs` | Sliding-window limiter per bucket (read, write, structured scopes)                                                                          |
+| `api/retry.rs`      | Full-jitter backoff, `Retry-After` as seconds or HTTP date; non-idempotent requests are not retried on 5xx                                  |
+| `api/error.rs`      | `ApiError`, a tagged enum mapped from status codes and JSON:API error bodies                                                                |
+| `api/*.rs`          | One module per resource: DTOs and endpoint functions                                                                                        |
+| `credentials.rs`    | `CredentialStore` trait with a keychain implementation and an in-memory one for tests                                                       |
+| `cache/`            | SQLite in WAL mode, versioned migrations, an FTS5 index over programs and assets, drafts, templates, saved searches and settings            |
+| `sync.rs`           | Fetches from the API and writes into the cache; detects scope and report changes                                                            |
+| `background.rs`     | Periodic report sync, change events and opt-in notifications                                                                                |
+| `ai/`               | Optional assistant: Anthropic, OpenAI-compatible and Ollama clients behind one `complete` call; no redirects, loopback-only local endpoints |
+| `redaction.rs`      | Registry of secret strings and a `MakeWriter` that scrubs them from every log line                                                          |
+| `commands/`         | Thin Tauri command handlers; errors become a tagged `CommandError` the UI can switch on                                                     |
 
 `leak_tests.rs` signs in against a mock server, exercises the commands at trace-level logging, and
 asserts the token and the base64 `Authorization` value appear in none of: raw logs, redacted logs,
-command responses, or the SQLite files on disk.
+command responses, or the SQLite files on disk. A second test does the same for the AI provider key
+and checks that prompt text never reaches the logs.
+
+## Report assistant
+
+The assistant is off by default. Its settings live in the `kv` table; the provider key lives in
+the keychain under its own account and is registered with the redaction registry when loaded. The
+webview sends a system prompt and a user prompt to `ai_complete` and gets text back; prompt
+building and reply parsing live in [`src/domain/ai-prompts.ts`](../src/domain/ai-prompts.ts) so
+they are unit-tested without a model. For hosted providers the composer also requires a per-program
+opt-in, stored locally, before it sends anything.
 
 ## Data flow: stale-while-revalidate
 

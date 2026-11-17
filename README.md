@@ -13,21 +13,29 @@ earnings, and search Hacktivity, all from one window.
 ## Features
 
 - **Programs.** Full-text search across every program and asset you can access, pinned
-  programs, and a "new" badge on scope that changed since your last sync. Export scope as JSON
-  or a plain asset list.
-- **Composer.** Pick an eligible asset, weakness and severity, write in a split Markdown editor
-  with live preview, tick off the program's exclusions, and review the exact JSON payload before
-  submitting. Drafts autosave locally. Reusable templates.
+  programs, and a "new" badge on scope that changed since your last sync. Export scope for your
+  tools: hosts, wildcards, URLs, CIDR ranges, a Burp Suite scope file or a Nuclei target list.
+  Private, local-only notes per program.
+- **Composer.** A guided flow from target to submission: a step rail that shows what is left, a
+  draft quality score with concrete hints, a CVSS 3.1 calculator that sets the severity and
+  records the vector, and per-weakness starter templates. Write in a split Markdown editor with
+  live preview, tick off the program's exclusions, and review the exact JSON payload before
+  submitting. Drafts autosave locally.
+- **Report assistant (optional, off by default).** Draft a report from rough notes, get title
+  ideas, tighten or restructure a section, and check the draft against the program policy. Bring
+  your own Anthropic or OpenAI key, or run a local model through Ollama. Hosted providers must be
+  allowed per program, and nothing is applied until you accept it.
 - **Finding import.** Drop a JSON file that follows the
   [published schema](docs/finding-import.md) and Scopedeck fills the draft, flagging anything it
   could not match against the program's scope or weaknesses.
 - **Report intents.** For programs that support them, submit through an intent and watch it
   move from pending to ready.
-- **Reports.** An inbox with state, severity and bounty columns, the full activity timeline, and
-  opt-in desktop notifications when something changes.
+- **Reports.** An inbox with cards, a list or a board by state, a "needs your attention" filter
+  for reports waiting on you, the full activity timeline, and opt-in desktop notifications.
 - **Hacktivity.** A query builder that compiles to the API's Lucene syntax, a raw query mode,
   saved searches and infinite scroll.
-- **Earnings.** Balance, monthly totals, per-program breakdown and CSV export.
+- **Earnings.** Balance, year to date against last year, average and largest bounty, monthly
+  totals, breakdowns by program and type, and CSV export.
 - **One toolbar everywhere.** Every page has search, sort, a filter sheet with live result
   counts, removable filter chips, and a card or list layout. Your choices are remembered per page.
 - **Keyboard first.** <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd> palette, `g`-sequences for
@@ -42,13 +50,21 @@ is implemented and what is linked out.
 | ---------------------------------------- | ------------------------------------------------ |
 | ![Filters](docs/screenshots/filters.png) | ![List view](docs/screenshots/programs-list.png) |
 
-| Program                                  | Composer                                   |
-| ---------------------------------------- | ------------------------------------------ |
-| ![Program](docs/screenshots/program.png) | ![Composer](docs/screenshots/composer.png) |
+| Composer                                   | CVSS calculator                             |
+| ------------------------------------------ | ------------------------------------------- |
+| ![Composer](docs/screenshots/composer.png) | ![CVSS](docs/screenshots/composer-cvss.png) |
 
-| Reports                                  | Report                                 |
-| ---------------------------------------- | -------------------------------------- |
-| ![Reports](docs/screenshots/reports.png) | ![Report](docs/screenshots/report.png) |
+| Report assistant                             | Assistant settings                         |
+| -------------------------------------------- | ------------------------------------------ |
+| ![Assistant](docs/screenshots/assistant.png) | ![Settings](docs/screenshots/settings.png) |
+
+| Reports board                                        | Report                                 |
+| ---------------------------------------------------- | -------------------------------------- |
+| ![Reports board](docs/screenshots/reports-board.png) | ![Report](docs/screenshots/report.png) |
+
+| Program                                  | Reports                                  |
+| ---------------------------------------- | ---------------------------------------- |
+| ![Program](docs/screenshots/program.png) | ![Reports](docs/screenshots/reports.png) |
 
 | Hacktivity                                     | Earnings                                   |
 | ---------------------------------------------- | ------------------------------------------ |
@@ -95,7 +111,12 @@ keychain.
   and raw HTML are stripped, and links open externally only when they point at hackerone.com.
 - **Nothing is sent anywhere else.** The only network peers are `api.hackerone.com`,
   HackerOne's logo CDN (`profile-photos.hackerone-user-content.com`, images only, no
-  credentials) and, for updates, GitHub Releases.
+  credentials), GitHub Releases for updates, and, only if you turn the report assistant on, the
+  AI provider you chose.
+- **The assistant is opt-in twice.** It is off until you enable it, and a hosted provider must
+  then be allowed for each program, because many programs forbid sharing undisclosed findings.
+  The provider key lives in the keychain like the HackerOne token, and redirects are refused so
+  the key cannot be forwarded to another host. Ollama runs locally and must be on loopback.
 
 Signing out deletes the keychain entry and the local cache. Report vulnerabilities in Scopedeck
 itself as described in [SECURITY.md](SECURITY.md).
