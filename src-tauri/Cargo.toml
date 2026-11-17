@@ -1,0 +1,41 @@
+[package]
+name = "scopedeck"
+version = "0.1.0"
+description = "Local-first desktop client for the HackerOne Hacker API"
+authors = ["Scopedeck contributors"]
+license = "MIT"
+edition = "2024"
+rust-version = "1.90"
+publish = false
+
+[lib]
+name = "scopedeck_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.5", features = [] }
+
+[dependencies]
+tauri = { version = "2.12.6", features = [] }
+tauri-plugin-opener = "2.7.3"
+tauri-plugin-notification = "2.8.1"
+tauri-plugin-updater = "2.14.1"
+tauri-plugin-dialog = "2.8.4"
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "multipart", "http2", "query"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tokio = { version = "1.54.1", features = ["sync", "time", "macros", "rt-multi-thread", "fs"] }
+thiserror = "2.0.21"
+keyring = "4.2.0"
+rusqlite = { version = "0.43.0", features = ["bundled"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
+url = "2.5.8"
+rand = "0.10.4"
+time = { version = "0.3.55", features = ["formatting", "parsing", "macros"] }
+base64 = "0.23.1"
+
+[dev-dependencies]
+wiremock = "0.6.5"
+tempfile = "3"
+tokio = { version = "1.54.1", features = ["test-util"] }
