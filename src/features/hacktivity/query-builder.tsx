@@ -1,11 +1,9 @@
 import { useId } from "react";
 import type { SeverityRating } from "@/ipc/common";
-import { hacktivitySortSchema, type HacktivitySort } from "@/ipc/hacktivity";
-import { Checkbox } from "@/components/ui/checkbox";
-import { DatePicker } from "@/components/ui/date-picker";
+import { ChipGroup, DateRange, FilterSection, NumberRange, ToggleFilter } from "@/components/filters";
+import { SeverityLabel } from "@/components/status";
 import { Field, Input, Textarea } from "@/components/ui/field";
-import { Select } from "@/components/ui/select";
-import { assetTypeLabel, humanize } from "@/domain/format";
+import { assetTypeLabel } from "@/domain/format";
 import {
   ASSET_TYPES,
   filterProblems,
@@ -13,77 +11,22 @@ import {
   type BuilderState,
   type HacktivityFilters,
 } from "@/domain/hacktivity-query";
-import { cn } from "@/lib/cn";
 
 const SEVERITIES: SeverityRating[] = ["critical", "high", "medium", "low", "none"];
 
-const SORT_LABELS: Record<HacktivitySort, string> = {
-  "-latest_disclosable_activity_at": "Latest activity",
-  latest_disclosable_activity_at: "Oldest activity",
-  "-disclosed_at": "Newest disclosures",
-  disclosed_at: "Oldest disclosures",
-  "-total_awarded_amount": "Highest bounty",
-  total_awarded_amount: "Lowest bounty",
-  "-votes": "Most votes",
-  votes: "Fewest votes",
-};
-
-const SORT_OPTIONS = hacktivitySortSchema.options.map((value) => ({ value, label: SORT_LABELS[value] }));
-
-const COLLABORATION_OPTIONS = [
-  { value: "any", label: "Any" },
+const COLLABORATION = [
   { value: "yes", label: "Collaborations only" },
   { value: "no", label: "Solo only" },
 ] as const;
-
-function Toggle({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: string }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={pressed}
-      onClick={onClick}
-      className={cn(
-        "h-7 rounded-md border px-2 text-[13px] whitespace-nowrap transition-colors",
-        pressed
-          ? "border-ink bg-raised text-ink"
-          : "border-line text-muted hover:border-line-strong hover:text-ink",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-function toggle<T>(values: readonly T[], value: T): T[] {
-  return values.includes(value) ? values.filter((candidate) => candidate !== value) : [...values, value];
-}
-
-function numberOrNull(raw: string): number | null {
-  if (!raw.trim()) return null;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-}
 
 interface QueryBuilderProps {
   state: BuilderState;
   onChange: (state: BuilderState) => void;
 }
 
+/** The Hacktivity search fields, laid out as filter-sheet sections. */
 export function QueryBuilder({ state, onChange }: QueryBuilderProps) {
-  const ids = {
-    raw: useId(),
-    cwe: useId(),
-    cve: useId(),
-    program: useId(),
-    reporter: useId(),
-    min: useId(),
-    max: useId(),
-    from: useId(),
-    to: useId(),
-    collaboration: useId(),
-    disclosed: useId(),
-    sort: useId(),
-  };
+  const ids = { raw: useId(), cwe: useId(), cve: useId(), program: useId(), reporter: useId() };
   const filters = state.filters;
   const set = (patch: Partial<HacktivityFilters>) => {
     onChange({ ...state, filters: { ...filters, ...patch } });
@@ -93,9 +36,13 @@ export function QueryBuilder({ state, onChange }: QueryBuilderProps) {
     problems.find((candidate) => candidate.field === field)?.message;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <div role="radiogroup" aria-label="Query mode" className="flex rounded-md border border-line p-0.5">
+    <>
+      <FilterSection title="Query mode" description="Use the builder, or write a Lucene query by hand.">
+        <div
+          role="radiogroup"
+          aria-label="Query mode"
+          className="flex w-fit rounded-md border border-line p-0.5"
+        >
           {(["builder", "raw"] as const).map((mode) => (
             <button
               key={mode}
@@ -109,184 +56,187 @@ export function QueryBuilder({ state, onChange }: QueryBuilderProps) {
                   raw: mode === "raw" && !state.raw ? queryStringFor(state) : state.raw,
                 });
               }}
-              className="h-6 rounded-sm px-2.5 text-[13px] text-muted aria-checked:bg-raised aria-checked:text-ink"
+              className="h-7 rounded-[5px] px-3 text-[13px] text-muted aria-checked:bg-raised aria-checked:text-ink"
             >
               {mode === "builder" ? "Builder" : "Lucene"}
             </button>
           ))}
         </div>
-        <label htmlFor={ids.sort} className="ml-auto text-[13px] text-faint">
-          Sort
-        </label>
-        <Select
-          id={ids.sort}
-          className="w-48"
-          value={state.sort}
-          onValueChange={(sort) => {
-            onChange({ ...state, sort });
-          }}
-          options={SORT_OPTIONS}
-        />
-      </div>
+      </FilterSection>
 
       {state.mode === "raw" ? (
-        <Field
-          label="Lucene query"
-          htmlFor={ids.raw}
-          hint="Fields: severity_rating, asset_type, substate, cwe, cve_ids, reporter, team, total_awarded_amount, disclosed_at, has_collaboration, disclosed."
-        >
-          <Textarea
-            id={ids.raw}
-            value={state.raw}
-            spellCheck={false}
-            onChange={(event) => {
-              onChange({ ...state, raw: event.target.value });
-            }}
-            className="min-h-20 font-mono"
-          />
-        </Field>
+        <FilterSection title="Lucene query">
+          <Field
+            label="Query"
+            htmlFor={ids.raw}
+            hint="Fields: severity_rating, asset_type, substate, cwe, cve_ids, reporter, team, total_awarded_amount, disclosed_at, has_collaboration, disclosed."
+          >
+            <Textarea
+              id={ids.raw}
+              value={state.raw}
+              spellCheck={false}
+              onChange={(event) => {
+                onChange({ ...state, raw: event.target.value });
+              }}
+              className="min-h-32 font-mono"
+            />
+          </Field>
+        </FilterSection>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Severity">
-            <span className="mr-1 w-24 text-[13px] text-faint">Severity</span>
-            {SEVERITIES.map((severity) => (
-              <Toggle
-                key={severity}
-                pressed={filters.severities.includes(severity)}
-                onClick={() => {
-                  set({ severities: toggle(filters.severities, severity) });
-                }}
-              >
-                {humanize(severity)}
-              </Toggle>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Asset type">
-            <span className="mr-1 w-24 text-[13px] text-faint">Asset type</span>
-            {ASSET_TYPES.map((assetType) => (
-              <Toggle
-                key={assetType}
-                pressed={filters.assetTypes.includes(assetType)}
-                onClick={() => {
-                  set({ assetTypes: toggle(filters.assetTypes, assetType) });
-                }}
-              >
-                {assetTypeLabel(assetType)}
-              </Toggle>
-            ))}
-          </div>
-          <div className="grid grid-cols-4 gap-3">
-            <Field label="CWE" htmlFor={ids.cwe}>
-              <Input
-                id={ids.cwe}
-                value={filters.cwe}
-                placeholder="79 or a name"
-                onChange={(event) => {
-                  set({ cwe: event.target.value });
-                }}
-              />
-            </Field>
-            <Field label="CVE" htmlFor={ids.cve} error={problem("cve")}>
-              <Input
-                id={ids.cve}
-                value={filters.cve}
-                placeholder="CVE-2024-12345"
-                onChange={(event) => {
-                  set({ cve: event.target.value });
-                }}
-              />
-            </Field>
-            <Field label="Program handle" htmlFor={ids.program}>
-              <Input
-                id={ids.program}
-                value={filters.program}
-                onChange={(event) => {
-                  set({ program: event.target.value });
-                }}
-              />
-            </Field>
-            <Field label="Reporter" htmlFor={ids.reporter}>
-              <Input
-                id={ids.reporter}
-                value={filters.reporter}
-                onChange={(event) => {
-                  set({ reporter: event.target.value });
-                }}
-              />
-            </Field>
-            <Field label="Bounty from (USD)" htmlFor={ids.min}>
-              <Input
-                id={ids.min}
-                inputMode="numeric"
-                value={filters.minBounty ?? ""}
-                onChange={(event) => {
-                  set({ minBounty: numberOrNull(event.target.value) });
-                }}
-              />
-            </Field>
-            <Field label="Bounty to (USD)" htmlFor={ids.max} error={problem("maxBounty")}>
-              <Input
-                id={ids.max}
-                inputMode="numeric"
-                value={filters.maxBounty ?? ""}
-                onChange={(event) => {
-                  set({ maxBounty: numberOrNull(event.target.value) });
-                }}
-              />
-            </Field>
-            <Field label="Disclosed from" htmlFor={ids.from}>
-              <DatePicker
-                id={ids.from}
-                value={filters.disclosedFrom}
-                onChange={(disclosedFrom) => {
-                  set({ disclosedFrom });
-                }}
-              />
-            </Field>
-            <Field label="Disclosed to" htmlFor={ids.to} error={problem("disclosedTo")}>
-              <DatePicker
-                id={ids.to}
-                value={filters.disclosedTo}
-                invalid={Boolean(problem("disclosedTo"))}
-                onChange={(disclosedTo) => {
-                  set({ disclosedTo });
-                }}
-              />
-            </Field>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <label htmlFor={ids.collaboration} className="text-[13px] text-faint">
-                Collaboration
-              </label>
-              <Select
-                id={ids.collaboration}
-                className="w-44"
-                value={filters.collaboration}
-                onValueChange={(collaboration) => {
-                  set({ collaboration });
-                }}
-                options={COLLABORATION_OPTIONS}
-              />
+          <FilterSection title="Disclosure">
+            <ToggleFilter
+              label="Disclosed reports only"
+              description="Include undisclosed activity when off."
+              checked={filters.disclosedOnly}
+              onChange={(disclosedOnly) => {
+                set({ disclosedOnly });
+              }}
+            />
+          </FilterSection>
+          <FilterSection
+            title="Severity"
+            onClear={
+              filters.severities.length
+                ? () => {
+                    set({ severities: [] });
+                  }
+                : undefined
+            }
+          >
+            <ChipGroup
+              label="Severity"
+              value={filters.severities}
+              onChange={(severities) => {
+                set({ severities });
+              }}
+              options={SEVERITIES.map((severity) => ({
+                value: severity,
+                label: <SeverityLabel rating={severity} />,
+              }))}
+            />
+          </FilterSection>
+          <FilterSection
+            title="Asset type"
+            onClear={
+              filters.assetTypes.length
+                ? () => {
+                    set({ assetTypes: [] });
+                  }
+                : undefined
+            }
+          >
+            <ChipGroup
+              label="Asset type"
+              value={filters.assetTypes}
+              onChange={(assetTypes) => {
+                set({ assetTypes });
+              }}
+              options={ASSET_TYPES.map((assetType) => ({
+                value: assetType,
+                label: assetTypeLabel(assetType),
+              }))}
+            />
+          </FilterSection>
+          <FilterSection title="Weakness and CVE">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="CWE" htmlFor={ids.cwe}>
+                <Input
+                  id={ids.cwe}
+                  value={filters.cwe}
+                  placeholder="79 or a name"
+                  onChange={(event) => {
+                    set({ cwe: event.target.value });
+                  }}
+                />
+              </Field>
+              <Field label="CVE" htmlFor={ids.cve} error={problem("cve")}>
+                <Input
+                  id={ids.cve}
+                  value={filters.cve}
+                  placeholder="CVE-2024-12345"
+                  onChange={(event) => {
+                    set({ cve: event.target.value });
+                  }}
+                />
+              </Field>
             </div>
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id={ids.disclosed}
-                checked={filters.disclosedOnly}
-                onCheckedChange={(disclosedOnly) => {
-                  set({ disclosedOnly });
-                }}
-              />
-              <label htmlFor={ids.disclosed} className="text-[13px] text-muted">
-                Disclosed reports only
-              </label>
+          </FilterSection>
+          <FilterSection title="Program and reporter" description="Separate several values with commas.">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Program handle" htmlFor={ids.program}>
+                <Input
+                  id={ids.program}
+                  value={filters.program}
+                  placeholder="security"
+                  onChange={(event) => {
+                    set({ program: event.target.value });
+                  }}
+                />
+              </Field>
+              <Field label="Reporter" htmlFor={ids.reporter}>
+                <Input
+                  id={ids.reporter}
+                  value={filters.reporter}
+                  placeholder="username"
+                  onChange={(event) => {
+                    set({ reporter: event.target.value });
+                  }}
+                />
+              </Field>
             </div>
-          </div>
+          </FilterSection>
+          <FilterSection
+            title="Bounty awarded"
+            onClear={
+              filters.minBounty !== null || filters.maxBounty !== null
+                ? () => {
+                    set({ minBounty: null, maxBounty: null });
+                  }
+                : undefined
+            }
+          >
+            <NumberRange
+              label="Bounty"
+              prefix="$"
+              min={filters.minBounty}
+              max={filters.maxBounty}
+              onChange={({ min, max }) => {
+                set({ minBounty: min, maxBounty: max });
+              }}
+            />
+          </FilterSection>
+          <FilterSection
+            title="Disclosed between"
+            onClear={
+              filters.disclosedFrom !== null || filters.disclosedTo !== null
+                ? () => {
+                    set({ disclosedFrom: null, disclosedTo: null });
+                  }
+                : undefined
+            }
+          >
+            <DateRange
+              label="Disclosed between"
+              from={filters.disclosedFrom}
+              to={filters.disclosedTo}
+              onChange={({ from, to }) => {
+                set({ disclosedFrom: from, disclosedTo: to });
+              }}
+            />
+          </FilterSection>
+          <FilterSection title="Collaboration">
+            <ChipGroup
+              label="Collaboration"
+              value={filters.collaboration === "any" ? [] : [filters.collaboration]}
+              onChange={(values) => {
+                set({ collaboration: values.at(-1) ?? "any" });
+              }}
+              options={COLLABORATION}
+            />
+          </FilterSection>
         </>
       )}
-      <p className="selectable truncate font-mono text-[13px] text-faint" aria-label="Compiled query">
-        {queryStringFor(state) || "All hacktivity"}
-      </p>
-    </div>
+    </>
   );
 }

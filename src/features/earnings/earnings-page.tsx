@@ -1,10 +1,24 @@
 import { ArrowUpRight, Download } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { z } from "zod";
 import { toast } from "sonner";
 import { describeError, toAppError } from "@/ipc/errors";
 import { earningsCached, earningsSync, type Earning, type Payout } from "@/ipc/payments";
 import { saveTextFile } from "@/ipc/system";
+import { CardGrid, cardClass } from "@/components/card-grid";
 import { DataTable } from "@/components/data-table";
+import {
+  ActiveFilters,
+  ChipGroup,
+  DateRange,
+  FilterSection,
+  FilterSheet,
+  NumberRange,
+  type ActiveFilter,
+} from "@/components/filters";
+import { ViewToolbar } from "@/components/view-toolbar";
+import { usePersistedState } from "@/lib/persisted-state";
+import { sortStateSchema, viewModeSchema, type SortState } from "@/lib/view-state";
 import { openOnHackerOne } from "@/lib/open-external";
 import { EmptyState, ErrorNotice, PageHeader, SyncStatus } from "@/components/status";
 import { Button } from "@/components/ui/button";
@@ -24,6 +38,7 @@ import {
 import { formatDate, formatMoney, humanize } from "@/domain/format";
 import { columnHelper } from "@/lib/table";
 import { ProgramLabel } from "@/features/programs/program-label";
+import { useProgramLookup } from "@/features/programs/use-programs";
 import { useViewAction } from "@/features/shell/view-actions";
 import { queryKeys } from "@/query/keys";
 import { useCachedResource } from "@/query/use-cached-resource";
@@ -55,7 +70,9 @@ const earningColumns = earningHelper.columns([
   earningHelper.accessor("amount", {
     header: "Amount",
     size: 120,
-    cell: (info) => <span className="font-mono tabular-nums">{formatMoney(info.getValue())}</span>,
+    cell: (info) => (
+      <span className="font-mono text-success tabular-nums">{formatMoney(info.getValue())}</span>
+    ),
   }),
 ]);
 
@@ -83,7 +100,9 @@ const payoutColumns = payoutHelper.columns([
     id: "amount",
     header: "Amount",
     size: 120,
-    cell: (info) => <span className="font-mono tabular-nums">{formatMoney(info.getValue())}</span>,
+    cell: (info) => (
+      <span className="font-mono text-success tabular-nums">{formatMoney(info.getValue())}</span>
+    ),
   }),
 ]);
 
@@ -122,6 +141,51 @@ async function exportCsv(name: string, rows: string[][]) {
   }
 }
 
+const KINDS = ["bounty", "retest", "pentest", "other"] as const;
+
+const filtersSchema = z.object({
+  kinds: z.array(z.enum(KINDS)).default([]),
+  programs: z.array(z.string()).default([]),
+  amountMin: z.number().nullable().default(null),
+  amountMax: z.number().nullable().default(null),
+  from: z.string().nullable().default(null),
+  to: z.string().nullable().default(null),
+});
+type EarningFilters = z.infer<typeof filtersSchema>;
+const EMPTY_FILTERS: EarningFilters = filtersSchema.parse({});
+
+const SORT_OPTIONS = [
+  { value: "date", label: "Date" },
+  { value: "amount", label: "Amount" },
+  { value: "program", label: "Program" },
+];
+const DEFAULT_SORT: SortState = { id: "date", desc: true };
+
+const compare: Record<string, (a: Earning, b: Earning) => number> = {
+  date: (a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""),
+  amount: (a, b) => a.amount - b.amount,
+  program: (a, b) =>
+    (a.programName ?? a.programHandle ?? "").localeCompare(b.programName ?? b.programHandle ?? ""),
+};
+
+function EarningCard({ earning }: { earning: Earning }) {
+  return (
+    <div className={cardClass}>
+      <div className="flex w-full items-center justify-between gap-3 text-[12px]">
+        <ProgramLabel handle={earning.programHandle} name={earning.programName} />
+        <span className="shrink-0 text-faint">{humanize(earning.kind)}</span>
+      </div>
+      <span className="font-mono text-[22px] leading-7 tracking-tight text-success tabular-nums">
+        {formatMoney(earning.amount)}
+      </span>
+      <div className="mt-auto flex w-full items-center justify-between border-t border-line pt-3 text-[12px] text-faint">
+        <span>{formatDate(earning.createdAt)}</span>
+        {earning.reportId ? <span className="font-mono">#{earning.reportId}</span> : null}
+      </div>
+    </div>
+  );
+}
+
 export function EarningsPage() {
   const snapshot = useCachedResource({
     cacheKey: queryKeys.earnings.cached,
@@ -130,11 +194,103 @@ export function EarningsPage() {
     sync: earningsSync,
   });
   useViewAction("refresh", snapshot.refresh);
-  const earnings = useMemo(() => snapshot.data?.earnings ?? [], [snapshot.data]);
+  const lookup = useProgramLookup();
+  const [query, setQuery] = useState("");
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [mode, setMode] = usePersistedState("earnings.mode", viewModeSchema, "cards");
+  const [sort, setSort] = usePersistedState("earnings.sort", sortStateSchema, DEFAULT_SORT);
+  const [filters, setFilters] = usePersistedState("earnings.filters", filtersSchema, EMPTY_FILTERS);
+
+  const all = useMemo(() => snapshot.data?.earnings ?? [], [snapshot.data]);
   const payouts = useMemo(() => snapshot.data?.payouts ?? [], [snapshot.data]);
+  const earnings = useMemo(() => {
+    const needle = query.trim().toLowerCase().replace(/^#/, "");
+    const by = compare[sort.id] ?? compare.date;
+    const direction = sort.desc ? -1 : 1;
+    return all
+      .filter((earning) => {
+        const haystack = `${earning.programName ?? ""} ${earning.programHandle ?? ""} ${earning.reportId ?? ""}`;
+        if (needle && !haystack.toLowerCase().includes(needle)) return false;
+        if (filters.kinds.length && !filters.kinds.includes(earning.kind)) return false;
+        if (filters.programs.length && !filters.programs.includes(earning.programHandle ?? "")) return false;
+        if (filters.amountMin !== null && earning.amount < filters.amountMin) return false;
+        if (filters.amountMax !== null && earning.amount > filters.amountMax) return false;
+        const day = earning.createdAt?.slice(0, 10) ?? null;
+        if (filters.from && (!day || day < filters.from)) return false;
+        if (filters.to && (!day || day > filters.to)) return false;
+        return true;
+      })
+      .toSorted((a, b) => (by ? direction * by(a, b) : 0));
+  }, [all, query, filters, sort]);
   const months = useMemo(() => lastMonths(earningsByMonth(earnings), 12, new Date()), [earnings]);
   const years = useMemo(() => earningsByYear(earnings).reverse(), [earnings]);
   const programs = useMemo(() => earningsByProgram(earnings), [earnings]);
+  const programHandles = useMemo(
+    () => [...new Set(all.map((earning) => earning.programHandle ?? "").filter(Boolean))].sort(),
+    [all],
+  );
+
+  const set = (patch: Partial<EarningFilters>) => {
+    setFilters((current) => ({ ...current, ...patch }));
+  };
+  const programName = (handle: string) =>
+    lookup.get(handle)?.name ??
+    all.find((earning) => earning.programHandle === handle)?.programName ??
+    handle;
+  const activeCount = [
+    filters.kinds.length > 0,
+    filters.programs.length > 0,
+    filters.amountMin !== null || filters.amountMax !== null,
+    filters.from !== null || filters.to !== null,
+  ].filter(Boolean).length;
+  const filtered = activeCount > 0 || query.trim() !== "";
+
+  const chips: ActiveFilter[] = [
+    ...filters.kinds.map((kind) => ({
+      key: `kind:${kind}`,
+      label: humanize(kind),
+      onRemove: () => {
+        set({ kinds: filters.kinds.filter((value) => value !== kind) });
+      },
+    })),
+    ...filters.programs.map((handle) => ({
+      key: `program:${handle}`,
+      label: programName(handle),
+      onRemove: () => {
+        set({ programs: filters.programs.filter((value) => value !== handle) });
+      },
+    })),
+    ...(filters.amountMin !== null || filters.amountMax !== null
+      ? [
+          {
+            key: "amount",
+            label: `Amount ${filters.amountMin === null ? "" : formatMoney(filters.amountMin)}–${
+              filters.amountMax === null ? "" : formatMoney(filters.amountMax)
+            }`,
+            onRemove: () => {
+              set({ amountMin: null, amountMax: null });
+            },
+          },
+        ]
+      : []),
+    ...(filters.from !== null || filters.to !== null
+      ? [
+          {
+            key: "date",
+            label: `${filters.from ?? ""}–${filters.to ?? ""}`,
+            onRemove: () => {
+              set({ from: null, to: null });
+            },
+          },
+        ]
+      : []),
+  ];
+
+  const emptyEarnings = (
+    <EmptyState
+      title={snapshot.loadingCache ? "Loading" : all.length ? "No earnings match" : "No earnings yet"}
+    />
+  );
 
   return (
     <>
@@ -155,15 +311,35 @@ export function EarningsPage() {
           </>
         }
       />
+      <ViewToolbar
+        search={{ value: query, onChange: setQuery, placeholder: "Search by program or #report" }}
+        sort={{ options: SORT_OPTIONS, value: sort, onChange: setSort }}
+        filters={{
+          activeCount,
+          onOpen: () => {
+            setSheetOpen(true);
+          },
+        }}
+        view={{ mode, onChange: setMode }}
+      />
+      <ActiveFilters
+        filters={chips}
+        onClearAll={() => {
+          setFilters(EMPTY_FILTERS);
+        }}
+      />
       {snapshot.syncError ? <ErrorNotice error={snapshot.syncError} className="mx-5 mt-3" /> : null}
       <div className="grid shrink-0 grid-cols-4 border-b border-line">
         <Stat
           label="Balance"
-          value={snapshot.data?.balance ? formatMoney(snapshot.data.balance.balance) : "-"}
+          value={snapshot.data?.balance ? formatMoney(snapshot.data.balance.balance) : "–"}
         />
-        <Stat label="Total earned" value={formatMoney(totalAmount(earnings))} />
+        <Stat
+          label={filtered ? "Earned (filtered)" : "Total earned"}
+          value={formatMoney(totalAmount(earnings))}
+        />
         <Stat label="Paid out" value={formatMoney(totalAmount(payouts))} />
-        <Stat label="Earning events" value={String(earnings.length)} />
+        <Stat label={filtered ? "Events (filtered)" : "Earning events"} value={String(earnings.length)} />
       </div>
       <div className="grid shrink-0 grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-8 border-b border-line px-5 py-4">
         <BarChart data={months} title="Last 12 months" />
@@ -198,26 +374,127 @@ export function EarningsPage() {
           </div>
         </TabsList>
         <TabsContent value="earnings" className="flex flex-col">
-          <DataTable
-            label="Earnings"
-            data={earnings}
-            columns={earningColumns}
-            getRowId={(row) => row.id}
-            initialSorting={[{ id: "date", desc: true }]}
-            empty={<EmptyState title={snapshot.loadingCache ? "Loading" : "No earnings yet"} />}
-          />
+          {mode === "list" ? (
+            <DataTable
+              label="Earnings"
+              data={earnings}
+              columns={earningColumns}
+              getRowId={(row) => row.id}
+              sort={sort}
+              onSortChange={setSort}
+              sortableIds={["date", "program", "amount"]}
+              empty={emptyEarnings}
+            />
+          ) : (
+            <CardGrid
+              label="Earnings"
+              items={earnings}
+              getKey={(earning) => earning.id}
+              cardHeight={136}
+              minCardWidth={240}
+              empty={emptyEarnings}
+              renderCard={(earning) => <EarningCard earning={earning} />}
+            />
+          )}
         </TabsContent>
         <TabsContent value="payouts" className="flex flex-col">
           <DataTable
             label="Payouts"
             data={payouts}
             columns={payoutColumns}
-            getRowId={(row, index) => `${row.reference ?? "payout"}-${index}`}
+            getRowId={(row, index) => `${row.reference ?? "payout"}-${String(index)}`}
             initialSorting={[{ id: "date", desc: true }]}
             empty={<EmptyState title={snapshot.loadingCache ? "Loading" : "No payouts yet"} />}
           />
         </TabsContent>
       </Tabs>
+
+      <FilterSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        activeCount={activeCount}
+        resultCount={earnings.length}
+        onReset={() => {
+          setFilters(EMPTY_FILTERS);
+        }}
+      >
+        <FilterSection title="Type" description="Totals, the chart and CSV export follow these filters.">
+          <ChipGroup
+            label="Type"
+            value={filters.kinds}
+            onChange={(kinds) => {
+              set({ kinds });
+            }}
+            options={KINDS.map((kind) => ({
+              value: kind,
+              label: humanize(kind),
+              count: all.filter((earning) => earning.kind === kind).length,
+            }))}
+          />
+        </FilterSection>
+        <FilterSection
+          title="Program"
+          onClear={
+            filters.programs.length
+              ? () => {
+                  set({ programs: [] });
+                }
+              : undefined
+          }
+        >
+          <ChipGroup
+            label="Program"
+            value={filters.programs}
+            onChange={(values) => {
+              set({ programs: values });
+            }}
+            options={programHandles.map((handle) => ({
+              value: handle,
+              label: programName(handle),
+              count: all.filter((earning) => earning.programHandle === handle).length,
+            }))}
+          />
+        </FilterSection>
+        <FilterSection
+          title="Amount"
+          onClear={
+            filters.amountMin !== null || filters.amountMax !== null
+              ? () => {
+                  set({ amountMin: null, amountMax: null });
+                }
+              : undefined
+          }
+        >
+          <NumberRange
+            label="Amount"
+            prefix="$"
+            min={filters.amountMin}
+            max={filters.amountMax}
+            onChange={({ min, max }) => {
+              set({ amountMin: min, amountMax: max });
+            }}
+          />
+        </FilterSection>
+        <FilterSection
+          title="Date"
+          onClear={
+            filters.from !== null || filters.to !== null
+              ? () => {
+                  set({ from: null, to: null });
+                }
+              : undefined
+          }
+        >
+          <DateRange
+            label="Date"
+            from={filters.from}
+            to={filters.to}
+            onChange={({ from, to }) => {
+              set({ from, to });
+            }}
+          />
+        </FilterSection>
+      </FilterSheet>
     </>
   );
 }

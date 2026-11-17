@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { severityRatingSchema } from "@/ipc/common";
-import { hacktivitySortSchema } from "@/ipc/hacktivity";
+import { hacktivitySortSchema, type HacktivitySort } from "@/ipc/hacktivity";
 
 export const ASSET_TYPES = [
   "URL",
@@ -159,4 +159,44 @@ export function filterProblems(filters: HacktivityFilters): FilterProblem[] {
     }
   }
   return problems;
+}
+
+/** Sort fields the Hacktivity API accepts. Direction is encoded as a `-` prefix. */
+export const HACKTIVITY_SORT_FIELDS = [
+  { value: "latest_disclosable_activity_at", label: "Latest activity" },
+  { value: "disclosed_at", label: "Disclosure date" },
+  { value: "total_awarded_amount", label: "Bounty" },
+  { value: "votes", label: "Votes" },
+];
+
+/**
+ * Splits an API sort into the toolbar's field and direction.
+ *
+ * @example splitSort("-votes") // { id: "votes", desc: true }
+ */
+export function splitSort(sort: HacktivitySort): { id: string; desc: boolean } {
+  return sort.startsWith("-") ? { id: sort.slice(1), desc: true } : { id: sort, desc: false };
+}
+
+/** Joins a toolbar field and direction back into an API sort, or null for an unknown field. */
+export function joinSort(id: string, desc: boolean): HacktivitySort | null {
+  const parsed = hacktivitySortSchema.safeParse(desc ? `-${id}` : id);
+  return parsed.success ? parsed.data : null;
+}
+
+/** How many independent filters narrow the search, for the toolbar badge. A raw query counts as one. */
+export function activeHacktivityFilterCount(state: BuilderState): number {
+  if (state.mode === "raw") return state.raw.trim() ? 1 : 0;
+  const filters = state.filters;
+  return [
+    filters.severities.length > 0,
+    filters.assetTypes.length > 0,
+    filters.cwe.trim() !== "",
+    filters.cve.trim() !== "",
+    filters.program.trim() !== "",
+    filters.reporter.trim() !== "",
+    filters.minBounty !== null || filters.maxBounty !== null,
+    filters.disclosedFrom !== null || filters.disclosedTo !== null,
+    filters.collaboration !== "any",
+  ].filter(Boolean).length;
 }

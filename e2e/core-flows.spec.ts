@@ -112,15 +112,33 @@ test("opens a report with its activity timeline", async ({ signedIn: page }) => 
 test("searches hacktivity with the query builder", async ({ signedIn: page }) => {
   await page.getByRole("link", { name: "Hacktivity" }).click();
   await expect(page.getByText("SSRF in PDF renderer")).toBeVisible();
-  await page.getByRole("group", { name: "Severity" }).getByRole("button", { name: "Critical" }).click();
-  await page.getByLabel("Program handle").fill("acme");
-  await expect(page.getByLabel("Compiled query")).toHaveText(
+  await page.getByRole("button", { name: "Filters" }).click();
+  const sheet = page.getByRole("dialog", { name: "Filters" });
+  await sheet.getByRole("group", { name: "Severity" }).getByRole("button", { name: "Critical" }).click();
+  await sheet.getByLabel("Program handle").fill("acme");
+  await expect(sheet.getByLabel("Compiled query")).toHaveText(
     "disclosed:true AND severity_rating:critical AND team:acme",
   );
-  await page.getByRole("button", { name: "Search" }).click();
+  await sheet.getByRole("button", { name: "Apply" }).click();
   await expect
     .poll(() => page.evaluate(() => window.__mockBackend?.hacktivityQueries.at(-1)))
     .toBe("disclosed:true AND severity_rating:critical AND team:acme");
+  await expect(page.getByRole("button", { name: /Remove filter Severity: Critical/ })).toBeVisible();
+});
+
+test("filters programs from the sheet and switches between cards and list", async ({ signedIn: page }) => {
+  const programs = page.getByRole("region", { name: "Programs" });
+  await expect(programs.getByText("Globex", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Filters" }).click();
+  const sheet = page.getByRole("dialog", { name: "Filters" });
+  await sheet.getByRole("group", { name: "Program type" }).getByRole("button", { name: /VDP/ }).click();
+  await sheet.getByRole("button", { name: "Done" }).click();
+  await expect(programs.getByText("Acme Corp", { exact: true })).toBeHidden();
+  await expect(programs.getByText("Globex", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "List view" }).click();
+  await expect(page.getByRole("columnheader", { name: "Program" })).toBeVisible();
+  await page.getByRole("button", { name: "Clear all" }).click();
+  await expect(programs.getByText("Acme Corp", { exact: true })).toBeVisible();
 });
 
 test("opens the command palette and jumps to a program", async ({ signedIn: page }) => {

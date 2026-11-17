@@ -97,6 +97,28 @@ function report(id: string, title: string, state: string, extra: Json = {}): Jso
   };
 }
 
+const EARNINGS: Json[] = [
+  {
+    id: "1",
+    kind: "bounty",
+    amount: 1500,
+    createdAt: "2026-09-01T00:00:00Z",
+    programHandle: "acme",
+    programName: "Acme Corp",
+    reportId: "1002",
+  },
+];
+
+const PAYOUTS: Json[] = [
+  {
+    amount: 750,
+    paidOutAt: "2026-10-01T00:00:00Z",
+    reference: "PO-1",
+    payoutProvider: "PayPal",
+    status: "sent",
+  },
+];
+
 interface MockState {
   username: string | null;
   programs: Json[];
@@ -107,6 +129,11 @@ interface MockState {
   settings: Json;
   submitted: Json[];
   hacktivityQueries: string[];
+  hacktivity: Json[];
+  balance: number;
+  earnings: Json[];
+  payouts: Json[];
+  intents: Json[];
 }
 
 function initialState(): MockState {
@@ -123,6 +150,33 @@ function initialState(): MockState {
     settings: { theme: "dark", syncIntervalMinutes: 15, notifications: false },
     submitted: [],
     hacktivityQueries: [],
+    hacktivity: [
+      {
+        id: "689314",
+        title: "SSRF in PDF renderer",
+        substate: "Resolved",
+        url: "https://hackerone.com/reports/689314",
+        disclosed: true,
+        disclosedAt: "2026-06-01T00:00:00Z",
+        submittedAt: null,
+        cveIds: [],
+        cwe: "Server-Side Request Forgery (SSRF)",
+        severityRating: "critical",
+        votes: 42,
+        totalAwardedAmount: 10000,
+        latestDisclosableAction: "Activities::ReportBecamePublic",
+        latestDisclosableActivityAt: "2026-06-01T00:00:00Z",
+        summary: null,
+        reporterUsername: "finder",
+        programHandle: "acme",
+        programName: "Acme Corp",
+        programUrl: null,
+      },
+    ],
+    balance: 750,
+    earnings: EARNINGS,
+    payouts: PAYOUTS,
+    intents: [],
   };
 }
 
@@ -249,7 +303,7 @@ function handle(state: MockState, command: string, payload: InvokeArgs | undefin
       return created;
     }
     case "intents_list":
-      return [];
+      return state.intents;
     case "hacktivity_cached":
       return null;
     case "hacktivity_fetch": {
@@ -257,29 +311,7 @@ function handle(state: MockState, command: string, payload: InvokeArgs | undefin
       state.hacktivityQueries.push(String(query.queryString));
       return {
         page: {
-          items: [
-            {
-              id: "689314",
-              title: "SSRF in PDF renderer",
-              substate: "Resolved",
-              url: "https://hackerone.com/reports/689314",
-              disclosed: true,
-              disclosedAt: "2026-06-01T00:00:00Z",
-              submittedAt: null,
-              cveIds: [],
-              cwe: "Server-Side Request Forgery (SSRF)",
-              severityRating: "critical",
-              votes: 42,
-              totalAwardedAmount: 10000,
-              latestDisclosableAction: "Activities::ReportBecamePublic",
-              latestDisclosableActivityAt: "2026-06-01T00:00:00Z",
-              summary: null,
-              reporterUsername: "finder",
-              programHandle: "acme",
-              programName: "Acme Corp",
-              programUrl: null,
-            },
-          ],
+          items: state.hacktivity,
           pageNumber: query.pageNumber,
           hasNextPage: false,
         },
@@ -289,27 +321,9 @@ function handle(state: MockState, command: string, payload: InvokeArgs | undefin
     case "earnings_cached":
     case "earnings_sync":
       return cached({
-        balance: { balance: 750 },
-        earnings: [
-          {
-            id: "1",
-            kind: "bounty",
-            amount: 1500,
-            createdAt: "2026-09-01T00:00:00Z",
-            programHandle: "acme",
-            programName: "Acme Corp",
-            reportId: "1002",
-          },
-        ],
-        payouts: [
-          {
-            amount: 750,
-            paidOutAt: "2026-10-01T00:00:00Z",
-            reference: "PO-1",
-            payoutProvider: "PayPal",
-            status: "sent",
-          },
-        ],
+        balance: { balance: state.balance },
+        earnings: state.earnings,
+        payouts: state.payouts,
       });
     case "drafts_list":
       return [...state.drafts.values()];
