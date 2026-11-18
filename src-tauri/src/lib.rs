@@ -27,6 +27,10 @@ use crate::state::AppState;
 
 const API_BASE_URL_ENV: &str = "SCOPEDECK_API_BASE_URL";
 
+/// Passed by the Windows uninstaller when the user asks to remove their data. Keychain entries
+/// live outside the app's folders, so only the app itself knows how to find and delete them.
+const REMOVE_CREDENTIALS_FLAG: &str = "--remove-credentials";
+
 /// Tests and local development may point the client at a mock server, but only over HTTPS or
 /// at loopback, so a stray environment variable cannot send credentials across the network.
 fn api_base_url() -> Url {
@@ -55,6 +59,10 @@ fn api_base_url() -> Url {
 ///
 /// Panics if the Tauri runtime fails to start, which leaves nothing to recover into.
 pub fn run() {
+    if std::env::args_os().skip(1).any(|arg| arg == REMOVE_CREDENTIALS_FLAG) {
+        std::process::exit(i32::from(credentials::remove_all(&KeychainStore, &KeychainStore).is_err()));
+    }
+
     let secrets = SecretRegistry::default();
     logging::init(secrets.clone());
 

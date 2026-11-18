@@ -71,6 +71,15 @@ pub(crate) trait AiKeyStore: Send + Sync {
     fn clear(&self) -> Result<(), CredentialError>;
 }
 
+/// Deletes every secret Scopedeck keeps in the system keychain: the Hacker API credentials and
+/// the AI provider key. Missing entries are not an error.
+/// Both are attempted even if the first fails, so one broken entry cannot strand the other.
+pub(crate) fn remove_all(api: &dyn CredentialStore, ai: &dyn AiKeyStore) -> Result<(), CredentialError> {
+    let api = api.clear();
+    let ai = ai.clear();
+    api.and(ai)
+}
+
 #[derive(Serialize, Deserialize)]
 struct StoredCredentials {
     username: String,
@@ -193,6 +202,19 @@ pub(crate) mod memory {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn remove_all_clears_the_token_and_the_ai_key() {
+        let api = memory::MemoryStore::default();
+        let ai = memory::MemoryAiKeyStore::default();
+        CredentialStore::save(&api, &Credentials::new("hacker", "token-value").unwrap()).unwrap();
+        AiKeyStore::save(&ai, "sk-test-key").unwrap();
+
+        remove_all(&api, &ai).unwrap();
+
+        assert!(CredentialStore::load(&api).unwrap().is_none());
+        assert!(AiKeyStore::load(&ai).unwrap().is_none());
+    }
 
     #[test]
     fn debug_output_never_contains_the_token() {

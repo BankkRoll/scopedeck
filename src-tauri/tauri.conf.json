@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Scopedeck",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "identifier": "dev.scopedeck.app",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -44,7 +44,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis", "app", "dmg", "deb", "rpm", "appimage"],
     "createUpdaterArtifacts": true,
     "category": "DeveloperTool",
     "shortDescription": "Desktop client for the HackerOne Hacker API",
@@ -55,7 +55,18 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "homepage": "https://github.com/BankkRoll/scopedeck",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "template": "windows/installer.nsi",
+        "installerHooks": "windows/hooks.nsh",
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "windows/installer-header.bmp",
+        "compression": "lzma"
+      }
+    }
   },
   "plugins": {
     "updater": {

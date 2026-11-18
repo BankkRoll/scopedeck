@@ -70,6 +70,20 @@ building and reply parsing live in [`src/domain/ai-prompts.ts`](../src/domain/ai
 they are unit-tested without a model. For hosted providers the composer also requires a per-program
 opt-in, stored locally, before it sends anything.
 
+## Windows installer
+
+The NSIS installer uses Scopedeck's own template,
+[`src-tauri/windows/installer.nsi`](../src-tauri/windows/installer.nsi), forked from the Tauri CLI
+2.12.5 template. Sections, registry layout and command-line modes (`/S`, `/P`, `/UPDATE`, `/NS`,
+`/R`, `/D=`) match upstream so the updater keeps working; only the pages differ. The installer is
+one page that installs, updates, reinstalls or downgrades in place, then a progress page and a
+finish page. The uninstaller has its own confirm and finish pages. When the user opts to remove
+their data, [`hooks.nsh`](../src-tauri/windows/hooks.nsh) runs the app with `--remove-credentials`
+before its files are deleted, because only the app knows how its keychain entries are named.
+
+When upgrading the Tauri CLI, diff the new upstream template against 2.12.5 and carry over any
+changes outside the page code.
+
 ## Data flow: stale-while-revalidate
 
 Each synced resource has two commands, `*_cached` and `*_sync`. The UI runs both as separate
