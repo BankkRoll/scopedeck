@@ -33,6 +33,27 @@ export function formatRelative(iso: string | null | undefined, now: Date = new D
   return "just now";
 }
 
+/**
+ * The time between two timestamps as a short span, such as "45 min", "6 h" or "3 days". Empty
+ * when either side is missing or the end comes before the start.
+ *
+ * @example formatDuration("2026-01-01T00:00:00Z", "2026-01-03T12:00:00Z") // "2.5 days"
+ */
+export function formatDuration(fromIso: string | null | undefined, toIso: string | null | undefined): string {
+  const from = parse(fromIso);
+  const to = parse(toIso);
+  if (!from || !to) return "";
+  const minutes = (to.getTime() - from.getTime()) / 60_000;
+  if (minutes < 0) return "";
+  if (minutes < 1) return "under a minute";
+  if (minutes < 60) return `${Math.round(minutes)} min`;
+  const hours = minutes / 60;
+  if (hours < 48) return `${Math.round(hours)} h`;
+  const days = hours / 24;
+  const rounded = days < 10 ? Math.round(days * 2) / 2 : Math.round(days);
+  return `${rounded} days`;
+}
+
 export function formatDate(iso: string | null | undefined): string {
   const date = parse(iso);
   return date ? dateFormat.format(date) : "";

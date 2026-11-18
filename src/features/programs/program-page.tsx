@@ -1,5 +1,6 @@
 import { Link, useParams } from "@tanstack/react-router";
 import { ArrowUpRight, Star } from "lucide-react";
+import { useMemo } from "react";
 import { openOnHackerOne } from "@/lib/open-external";
 import { Markdown } from "@/components/markdown";
 import { EmptyState, ErrorNotice, PageHeader, SyncStatus } from "@/components/status";
@@ -8,10 +9,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { hackerOne } from "@/domain/deep-links";
-import { formatDate, formatMoney, humanize } from "@/domain/format";
+import { formatDate, formatMoney, formatRelative, humanize } from "@/domain/format";
+import { formatPercent, reportsForProgram, validReportRate } from "@/domain/program-insights";
 import { cn } from "@/lib/cn";
 import { useViewAction } from "@/features/shell/view-actions";
+import { useReports } from "@/features/reports/use-reports";
 import { NotesPanel } from "./notes-panel";
+import { ProgramHacktivityTab } from "./program-hacktivity-tab";
+import { ProgramReportsTab } from "./program-reports-tab";
 import { ScopePanel } from "./scope-panel";
 import { usePinProgram, useProgram } from "./use-programs";
 
@@ -21,12 +26,33 @@ export function ProgramPage() {
   const pin = usePinProgram();
   useViewAction("refresh", detail.refresh);
 
+  const reports = useReports();
+  const myReports = useMemo(() => reportsForProgram(reports.data ?? [], handle), [reports.data, handle]);
+
   const program = detail.data?.program;
   const name = program?.name ?? handle;
+  const validRate = validReportRate(
+    program?.numberOfReportsForUser ?? null,
+    program?.numberOfValidReportsForUser ?? null,
+  );
+  const stats: [label: string, value: string][] = program
+    ? [
+        ["My reports", String(program.numberOfReportsForUser ?? 0)],
+        ["Valid", String(program.numberOfValidReportsForUser ?? 0)],
+        ...(validRate === null ? [] : [["Valid %", formatPercent(validRate)] as [string, string]]),
+        [
+          "Earned",
+          program.bountyEarnedForUser
+            ? formatMoney(program.bountyEarnedForUser, program.currency ?? "USD")
+            : "$0",
+        ],
+      ]
+    : [];
 
   return (
     <>
       <PageHeader
+        parent={{ to: "/programs", label: "Programs" }}
         title={name}
         meta={<span className="font-mono">{handle}</span>}
         actions={
@@ -83,28 +109,25 @@ export function ProgramPage() {
                   : humanize(program.submissionState) || "Unknown"}
               </Badge>
               <Badge>{humanize(program.state?.replace(/_mode$/, "")) || "Unknown"}</Badge>
+              {program.triageActive ? <Badge>Managed triage</Badge> : null}
               {program.fastPayments ? <Badge>Fast payments</Badge> : null}
               {program.goldStandardSafeHarbor ? <Badge>Gold standard safe harbor</Badge> : null}
               {program.openScope ? <Badge>Open scope</Badge> : null}
               {program.allowsBountySplitting ? <Badge>Bounty splitting</Badge> : null}
             </div>
-            {program.startedAcceptingAt ? (
-              <p className="text-[13px] text-faint">
-                Accepting reports since {formatDate(program.startedAcceptingAt)}
+            {program.startedAcceptingAt || program.lastInvitationAcceptedAtForUser ? (
+              <p className="flex flex-wrap gap-x-3 text-[13px] text-faint">
+                {program.startedAcceptingAt ? (
+                  <span>Accepting reports since {formatDate(program.startedAcceptingAt)}</span>
+                ) : null}
+                {program.lastInvitationAcceptedAtForUser ? (
+                  <span>Joined {formatDate(program.lastInvitationAcceptedAtForUser)}</span>
+                ) : null}
               </p>
             ) : null}
           </div>
-          <dl className="grid shrink-0 grid-cols-3 divide-x divide-line rounded-md border border-line">
-            {[
-              ["My reports", String(program.numberOfReportsForUser ?? 0)],
-              ["Valid", String(program.numberOfValidReportsForUser ?? 0)],
-              [
-                "Earned",
-                program.bountyEarnedForUser
-                  ? formatMoney(program.bountyEarnedForUser, program.currency ?? "USD")
-                  : "$0",
-              ],
-            ].map(([label, value]) => (
+          <dl className="flex shrink-0 divide-x divide-line rounded-md border border-line">
+            {stats.map(([label, value]) => (
               <div key={label} className="flex min-w-24 flex-col gap-0.5 px-4 py-2">
                 <dt className="text-[12px] text-faint">{label}</dt>
                 <dd className="font-mono text-[15px] text-ink tabular-nums">{value}</dd>
@@ -113,8 +136,9 @@ export function ProgramPage() {
           </dl>
         </div>
       ) : null}
-      <Tabs defaultValue="scope" className="flex min-h-0 flex-1 flex-col">
+      <Tabs defaultValue="policy" className="flex min-h-0 flex-1 flex-col">
         <TabsList>
+          <TabsTrigger value="policy">Policy</TabsTrigger>
           <TabsTrigger value="scope">
             Scope <span className="font-mono text-faint">{detail.data?.scopes.length ?? 0}</span>
           </TabsTrigger>
@@ -124,7 +148,10 @@ export function ProgramPage() {
           <TabsTrigger value="weaknesses">
             Weaknesses <span className="font-mono text-faint">{detail.data?.weaknesses.length ?? 0}</span>
           </TabsTrigger>
-          <TabsTrigger value="policy">Policy</TabsTrigger>
+          <TabsTrigger value="reports">
+            My reports <span className="font-mono text-faint">{myReports.length}</span>
+          </TabsTrigger>
+          <TabsTrigger value="hacktivity">Hacktivity</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
         </TabsList>
         <TabsContent value="scope">
@@ -135,7 +162,18 @@ export function ProgramPage() {
             <ul>
               {detail.data.exclusions.map((exclusion) => (
                 <li key={exclusion.id} className="border-b border-line px-5 py-3">
-                  <p className="font-medium">{exclusion.category ?? "Uncategorised"}</p>
+                  <div className="flex items-baseline justify-between gap-4">
+                    <p className="font-medium">{exclusion.category ?? "Uncategorised"}</p>
+                    {exclusion.updatedAt || exclusion.createdAt ? (
+                      <span
+                        className="shrink-0 text-[12px] text-faint"
+                        title={formatDate(exclusion.updatedAt ?? exclusion.createdAt)}
+                      >
+                        {exclusion.updatedAt ? "Updated" : "Added"}{" "}
+                        {formatRelative(exclusion.updatedAt ?? exclusion.createdAt)}
+                      </span>
+                    ) : null}
+                  </div>
                   {exclusion.details ? (
                     <p className="selectable mt-1 whitespace-pre-line text-muted">{exclusion.details}</p>
                   ) : null}
@@ -155,17 +193,30 @@ export function ProgramPage() {
                 <span className="w-20 shrink-0 font-mono text-faint">
                   {weakness.externalId?.toUpperCase() ?? ""}
                 </span>
-                <span className="text-ink">{weakness.name}</span>
+                <div className="min-w-0">
+                  <p className="text-ink">{weakness.name}</p>
+                  {weakness.description ? (
+                    <p className="selectable mt-0.5 line-clamp-2 text-[13px] text-muted">
+                      {weakness.description}
+                    </p>
+                  ) : null}
+                </div>
               </li>
             ))}
           </ul>
         </TabsContent>
-        <TabsContent value="policy" className="px-5 py-4">
+        <TabsContent value="policy" className="min-h-0 overflow-y-auto px-5 py-4">
           {program?.policy ? (
             <Markdown source={program.policy} className="max-w-3xl" />
           ) : (
             <EmptyState title="No policy text">The API returned no policy for this program.</EmptyState>
           )}
+        </TabsContent>
+        <TabsContent value="reports">
+          <ProgramReportsTab reports={myReports} loading={reports.loadingCache} />
+        </TabsContent>
+        <TabsContent value="hacktivity">
+          <ProgramHacktivityTab handle={handle} />
         </TabsContent>
         <TabsContent value="notes" className="flex min-h-0 flex-col overflow-hidden">
           <NotesPanel handle={handle} />

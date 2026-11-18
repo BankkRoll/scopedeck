@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Star } from "lucide-react";
+import { Globe, ShieldCheck, Split, Star, UserCheck, Zap, type LucideIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ProgramRow } from "@/ipc/programs";
 import { CardGrid, cardClass } from "@/components/card-grid";
@@ -30,6 +30,7 @@ import {
   type ProgramFilters,
   type ProgramPerk,
 } from "@/domain/program-filters";
+import { formatPercent, validReportRate } from "@/domain/program-insights";
 import { cn } from "@/lib/cn";
 import { usePersistedState } from "@/lib/persisted-state";
 import { columnHelper } from "@/lib/table";
@@ -83,6 +84,36 @@ function PinButton({ row }: { row: ProgramRow }) {
   );
 }
 
+const PERK_INDICATORS: Record<ProgramPerk, { icon: LucideIcon; short: string }> = {
+  fastPayments: { icon: Zap, short: "Fast pay" },
+  goldStandardSafeHarbor: { icon: ShieldCheck, short: "Safe harbor" },
+  openScope: { icon: Globe, short: "Open scope" },
+  triageActive: { icon: UserCheck, short: "Triage" },
+  allowsBountySplitting: { icon: Split, short: "Splitting" },
+};
+
+function PerkIndicators({ row }: { row: ProgramRow }) {
+  const perks = (Object.keys(PERK_INDICATORS) as ProgramPerk[]).filter((perk) => row[perk] === true);
+  if (perks.length === 0) return <p className="min-h-5 text-[12px] text-faint">No extra program perks</p>;
+  return (
+    <ul
+      aria-label="Program perks"
+      className="flex min-h-5 items-center gap-3 overflow-hidden text-[12px] text-muted"
+    >
+      {perks.map((perk) => {
+        const { icon: Icon, short } = PERK_INDICATORS[perk];
+        return (
+          <li key={perk} title={PERK_LABELS[perk]} className="inline-flex shrink-0 items-center gap-1">
+            <Icon className="size-3.5 text-faint" aria-hidden />
+            <span className="sr-only">{PERK_LABELS[perk]}</span>
+            <span aria-hidden>{short}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function Dash() {
   return <span className="text-faint">–</span>;
 }
@@ -132,6 +163,21 @@ const columns = helper.columns([
     cell: (info) =>
       info.getValue() ? <span className="font-mono text-ink tabular-nums">{info.getValue()}</span> : <Dash />,
   }),
+  helper.accessor((row) => row.numberOfValidReportsForUser ?? 0, {
+    id: "valid",
+    header: "Valid",
+    size: 100,
+    cell: (info) => {
+      const rate = validReportRate(info.row.original.numberOfReportsForUser, info.getValue());
+      if (rate === null) return <Dash />;
+      return (
+        <span className="font-mono tabular-nums">
+          <span className="text-ink">{info.getValue()}</span>{" "}
+          <span className="text-faint">{formatPercent(rate)}</span>
+        </span>
+      );
+    },
+  }),
   helper.accessor((row) => row.bountyEarnedForUser ?? 0, {
     id: "earned",
     header: "Earned",
@@ -150,7 +196,6 @@ const columns = helper.columns([
 const SORTABLE = ["name", "launched", "reports", "earned"];
 
 function ProgramCard({ row, onOpen }: { row: ProgramRow; onOpen: () => void }) {
-  const perks = (Object.keys(PERK_LABELS) as ProgramPerk[]).filter((perk) => row[perk] === true);
   return (
     <div
       role="button"
@@ -179,9 +224,7 @@ function ProgramCard({ row, onOpen }: { row: ProgramRow; onOpen: () => void }) {
         </Badge>
         {row.state && row.state !== "public_mode" ? <Badge>{visibilityLabel(row.state)}</Badge> : null}
       </div>
-      <p className="line-clamp-1 min-h-5 text-[12px] text-faint">
-        {perks.length ? perks.map((perk) => PERK_LABELS[perk]).join(" · ") : "No extra program perks"}
-      </p>
+      <PerkIndicators row={row} />
       <dl className="mt-auto grid grid-cols-3 border-t border-line pt-3 text-[12px]">
         <div>
           <dt className="text-faint">Launched</dt>

@@ -418,6 +418,15 @@ function Composer({ draftId, initialProgram, onCreated }: ComposerProps) {
     return metrics ? baseScore(metrics) : null;
   }, [cvssVector]);
   const template = weakness ? templateForWeakness(weakness) : null;
+  const selectedScope = detail?.scopes.find((scope) => scope.id === content.structuredScopeId);
+  const capIndex = SEVERITIES.findIndex((rating) => rating === selectedScope?.maxSeverity?.toLowerCase());
+  const severityCap =
+    selectedScope?.maxSeverity &&
+    content.severityRating &&
+    capIndex >= 0 &&
+    SEVERITIES.indexOf(content.severityRating) > capIndex
+      ? { asset: selectedScope.assetIdentifier, max: selectedScope.maxSeverity }
+      : null;
   const bodyEmpty = !content.vulnerabilityInformation.trim() || !content.impact.trim();
   const hasExclusions = Boolean(detail && detail.exclusions.length > 0);
 
@@ -685,6 +694,11 @@ function Composer({ draftId, initialProgram, onCreated }: ComposerProps) {
                 </div>
                 {problemFor("severityRating") ? (
                   <p className="text-[13px] text-warning">{problemFor("severityRating")}</p>
+                ) : null}
+                {severityCap ? (
+                  <p className="text-[13px] text-warning">
+                    The program caps {severityCap.asset} at {humanize(severityCap.max)} severity.
+                  </p>
                 ) : null}
               </fieldset>
             </section>

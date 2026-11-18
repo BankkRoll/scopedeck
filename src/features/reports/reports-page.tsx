@@ -70,7 +70,18 @@ const columns = helper.columns([
   helper.accessor("title", {
     header: "Title",
     size: 360,
-    cell: (info) => <span className="text-ink">{info.getValue()}</span>,
+    cell: (info) => (
+      <span className="flex min-w-0 items-center gap-2">
+        {needsAttention(info.row.original) ? (
+          <span
+            className="size-1.5 shrink-0 rounded-full bg-warning"
+            title="Awaiting you"
+            aria-label="Awaiting you"
+          />
+        ) : null}
+        <span className="truncate text-ink">{info.getValue()}</span>
+      </span>
+    ),
   }),
   helper.accessor((row) => row.program?.handle ?? "", {
     id: "program",
@@ -113,6 +124,16 @@ const REPORT_MODES: readonly ViewMode[] = ["cards", "list", "board"];
 
 const SORTABLE = ["id", "title", "severity", "bounty", "activity"];
 
+/** Marks a report where the program replied last or asked for more information. */
+function AwaitingYou() {
+  return (
+    <span className="ml-auto inline-flex items-center gap-1.5 text-[12px] text-warning">
+      <span className="size-1.5 rounded-full bg-warning" aria-hidden />
+      Awaiting you
+    </span>
+  );
+}
+
 function ReportCard({ report, onOpen }: { report: Report; onOpen: () => void }) {
   const bounty = bountyTotal(report.bounties);
   return (
@@ -125,6 +146,7 @@ function ReportCard({ report, onOpen }: { report: Report; onOpen: () => void }) 
       <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 text-[13px]">
         <ReportStateLabel state={report.state} />
         <SeverityLabel rating={report.severity?.rating} />
+        {needsAttention(report) ? <AwaitingYou /> : null}
       </div>
       <div className="mt-auto flex w-full items-center justify-between gap-3 border-t border-line pt-3 text-[12px]">
         <span className="min-w-0 truncate text-faint">{report.weakness?.name ?? "No weakness"}</span>

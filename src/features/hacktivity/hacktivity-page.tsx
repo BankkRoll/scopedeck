@@ -1,21 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ThumbsUp, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { toAppError } from "@/ipc/errors";
 import type { HacktivityItem } from "@/ipc/hacktivity";
 import { savedSearchDelete, savedSearchSave, savedSearchesList } from "@/ipc/workspace";
-import { openOnHackerOne } from "@/lib/open-external";
-import { CardGrid, cardClass } from "@/components/card-grid";
+import { CardGrid } from "@/components/card-grid";
 import { ActiveFilters, FilterSheet, type ActiveFilter } from "@/components/filters";
-import { ProgramAvatar } from "@/components/program-avatar";
-import { EmptyState, ErrorNotice, PageHeader, SeverityLabel } from "@/components/status";
+import { EmptyState, ErrorNotice, PageHeader } from "@/components/status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { ViewToolbar } from "@/components/view-toolbar";
-import { hackerOne } from "@/domain/deep-links";
-import { assetTypeLabel, formatDate, formatMoney, formatRelative, humanize } from "@/domain/format";
+import { assetTypeLabel, formatMoney, formatRelative, humanize } from "@/domain/format";
 import {
   DEFAULT_BUILDER_STATE,
   EMPTY_FILTERS,
@@ -31,114 +28,17 @@ import {
 } from "@/domain/hacktivity-query";
 import { usePersistedState } from "@/lib/persisted-state";
 import { viewModeSchema } from "@/lib/view-state";
-import { useProgramLookup } from "@/features/programs/use-programs";
 import { useViewAction } from "@/features/shell/view-actions";
 import { queryKeys } from "@/query/keys";
+import {
+  HACKTIVITY_CARD_HEIGHT,
+  HACKTIVITY_ROW_HEIGHT,
+  HacktivityCard,
+  HacktivityDetailSheet,
+  HacktivityRow,
+} from "./hacktivity-item";
 import { QueryBuilder } from "./query-builder";
 import { useHacktivity } from "./use-hacktivity";
-
-const ROW_HEIGHT = 76;
-
-function useProgramFor(item: HacktivityItem) {
-  const program = useProgramLookup().get(item.programHandle ?? "");
-  return { name: program?.name ?? item.programName ?? item.programHandle, logo: program?.profilePicture };
-}
-
-function itemUrl(item: HacktivityItem): string {
-  return item.url ?? hackerOne.report(item.id);
-}
-
-function HacktivityRow({ item }: { item: HacktivityItem }) {
-  const program = useProgramFor(item);
-  return (
-    <button
-      type="button"
-      onClick={() => void openOnHackerOne(itemUrl(item))}
-      className="flex h-[76px] w-full flex-col justify-center gap-1 border-b border-line px-5 text-left transition-colors hover:bg-hover"
-    >
-      <div className="flex w-full items-center gap-3">
-        <span className="w-24 shrink-0">
-          <SeverityLabel rating={item.severityRating} />
-        </span>
-        <span className="min-w-0 flex-1 truncate text-ink">{item.title ?? "Untitled report"}</span>
-        {item.totalAwardedAmount ? (
-          <span className="shrink-0 font-mono text-success tabular-nums">
-            {formatMoney(item.totalAwardedAmount)}
-          </span>
-        ) : null}
-      </div>
-      <div className="flex w-full items-center gap-3 text-[13px] text-faint">
-        <span className="w-24 shrink-0 font-mono">#{item.id}</span>
-        {program.name ? (
-          <span className="inline-flex shrink-0 items-center gap-1.5 text-muted">
-            <ProgramAvatar name={program.name} src={program.logo} size="xs" />
-            {program.name}
-          </span>
-        ) : null}
-        <span className="truncate">
-          {[
-            item.reporterUsername ? `by ${item.reporterUsername}` : null,
-            item.cwe,
-            item.cveIds.join(", ") || null,
-            item.substate ? humanize(item.substate.toLowerCase()) : null,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        </span>
-        <span className="ml-auto shrink-0">
-          {item.disclosedAt
-            ? `Disclosed ${formatDate(item.disclosedAt)}`
-            : formatRelative(item.latestDisclosableActivityAt)}
-          {item.votes ? ` · ${String(item.votes)} votes` : ""}
-        </span>
-      </div>
-    </button>
-  );
-}
-
-function HacktivityCard({ item }: { item: HacktivityItem }) {
-  const program = useProgramFor(item);
-  return (
-    <button type="button" onClick={() => void openOnHackerOne(itemUrl(item))} className={cardClass}>
-      <div className="flex w-full items-center justify-between gap-3 text-[13px]">
-        <SeverityLabel rating={item.severityRating} />
-        {item.totalAwardedAmount ? (
-          <span className="font-mono text-success tabular-nums">{formatMoney(item.totalAwardedAmount)}</span>
-        ) : (
-          <span className="text-faint">No bounty</span>
-        )}
-      </div>
-      <p className="line-clamp-2 min-h-10 text-[14px] leading-5 font-medium text-ink">
-        {item.title ?? "Untitled report"}
-      </p>
-      <div className="flex w-full items-center gap-2 text-[12px] text-muted">
-        {program.name ? (
-          <>
-            <ProgramAvatar name={program.name} src={program.logo} size="xs" />
-            <span className="truncate">{program.name}</span>
-          </>
-        ) : null}
-        {item.reporterUsername ? (
-          <span className="shrink-0 text-faint">by {item.reporterUsername}</span>
-        ) : null}
-      </div>
-      <div className="mt-auto flex w-full items-center justify-between border-t border-line pt-3 text-[12px] text-faint">
-        <span className="truncate">
-          {item.cwe ?? (item.substate ? humanize(item.substate.toLowerCase()) : "")}
-        </span>
-        <span className="inline-flex shrink-0 items-center gap-2">
-          {item.votes ? (
-            <span className="inline-flex items-center gap-1">
-              <ThumbsUp className="size-3" />
-              {item.votes}
-            </span>
-          ) : null}
-          {item.disclosedAt ? formatDate(item.disclosedAt) : formatRelative(item.latestDisclosableActivityAt)}
-        </span>
-      </div>
-    </button>
-  );
-}
 
 function SavedSearches({
   current,
@@ -302,6 +202,8 @@ export function HacktivityPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mode, setMode] = usePersistedState("hacktivity.mode", viewModeSchema, "cards");
   const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<HacktivityItem | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const results = useHacktivity(queryStringFor(applied), applied.sort, true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const loaded = useMemo(() => results.data?.pages.flatMap((page) => page.page.items) ?? [], [results.data]);
@@ -321,6 +223,10 @@ export function HacktivityPage() {
   const blocked = draft.mode === "builder" && filterProblems(draft.filters).length > 0;
   const { hasNextPage, isFetchingNextPage, fetchNextPage, refetch } = results;
 
+  const select = useCallback((item: HacktivityItem) => {
+    setSelected(item);
+    setDetailOpen(true);
+  }, []);
   const apply = (state: BuilderState) => {
     setApplied(state);
     setDraft(state);
@@ -332,7 +238,7 @@ export function HacktivityPage() {
   const virtualizer = useVirtualizer({
     count: items.length + (hasNextPage ? 1 : 0),
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: () => HACKTIVITY_ROW_HEIGHT,
     overscan: 8,
   });
   const virtualItems = virtualizer.getVirtualItems();
@@ -405,11 +311,11 @@ export function HacktivityPage() {
           label="Hacktivity results"
           items={items}
           getKey={(item) => item.id}
-          cardHeight={176}
+          cardHeight={HACKTIVITY_CARD_HEIGHT}
           minCardWidth={320}
           empty={empty}
           onEndReached={loadMore}
-          renderCard={(item) => <HacktivityCard item={item} />}
+          renderCard={(item) => <HacktivityCard item={item} onSelect={select} />}
         />
       ) : (
         <div
@@ -432,7 +338,7 @@ export function HacktivityPage() {
                   style={{ transform: `translateY(${String(row.start)}px)` }}
                 >
                   {item ? (
-                    <HacktivityRow item={item} />
+                    <HacktivityRow item={item} onSelect={select} />
                   ) : (
                     <div className="flex h-[76px] items-center px-5 text-muted">Loading more</div>
                   )}
@@ -442,6 +348,10 @@ export function HacktivityPage() {
           </div>
         </div>
       )}
+
+      {selected ? (
+        <HacktivityDetailSheet item={selected} open={detailOpen} onOpenChange={setDetailOpen} />
+      ) : null}
 
       <FilterSheet
         open={sheetOpen}

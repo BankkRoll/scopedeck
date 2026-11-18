@@ -9,9 +9,10 @@ import { EmptyState, SeverityLabel } from "@/components/status";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
-import { itemClass, popoverClass } from "@/components/ui/select";
+import { Select, itemClass, popoverClass, type SelectOption } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { assetTypeLabel } from "@/domain/format";
+import { assetTypeLabel, formatDate, formatRelative, humanize } from "@/domain/format";
+import { ciaRequirements, scopeTimestamp, sortScopesNewestFirst } from "@/domain/program-insights";
 import { cn } from "@/lib/cn";
 import {
   RECON_FORMATS,
@@ -154,16 +155,49 @@ function CopyAsset({ value }: { value: string }) {
   );
 }
 
+function AssetMeta({ scope, showType }: { scope: ScopeRow; showType: boolean }) {
+  const stamp = scopeTimestamp(scope);
+  const cia = ciaRequirements(scope);
+  if (!stamp && cia.length === 0 && !showType) return null;
+  return (
+    <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px] text-faint">
+      {showType ? <span className="text-muted">{assetTypeLabel(scope.assetType)}</span> : null}
+      {stamp ? (
+        <span title={formatDate(stamp.at)}>
+          {stamp.kind} {formatRelative(stamp.at)}
+        </span>
+      ) : null}
+      {cia.length > 0 ? (
+        <span
+          className="font-mono"
+          title={cia.map((req) => `${req.label} requirement: ${humanize(req.value)}`).join("\n")}
+          aria-label={cia.map((req) => `${req.label} ${req.value}`).join(", ")}
+        >
+          {cia.map((req) => `${req.key}:${req.value.charAt(0).toUpperCase()}`).join(" ")}
+        </span>
+      ) : null}
+    </p>
+  );
+}
+
+type ScopeOrder = "default" | "newest";
+
+const ORDER_OPTIONS: SelectOption<ScopeOrder>[] = [
+  { value: "default", label: "Group by type" },
+  { value: "newest", label: "Newest first" },
+];
+
 const ROW_GRID = "grid grid-cols-[minmax(0,1fr)_130px_120px_120px] items-start gap-4 px-5";
 
 /**
- * A program's structured scope grouped by asset type, with search, an eligibility switch and an
- * export menu for recon tooling.
+ * A program's structured scope grouped by asset type (or as one list, newest first), with search,
+ * an eligibility switch and an export menu for recon tooling.
  */
 export function ScopePanel({ scopes }: { scopes: ScopeRow[] }) {
   const switchId = useId();
   const [onlySubmittable, setOnlySubmittable] = useState(true);
   const [query, setQuery] = useState("");
+  const [order, setOrder] = useState<ScopeOrder>("default");
   const needle = query.trim().toLowerCase();
   const matching = useMemo(
     () =>
@@ -179,7 +213,15 @@ export function ScopePanel({ scopes }: { scopes: ScopeRow[] }) {
     () => (onlySubmittable ? submittableScopes(matching) : matching),
     [matching, onlySubmittable],
   );
-  const groups = groupByAssetType(visible);
+  const groups = useMemo(
+    () =>
+      order === "newest"
+        ? visible.length
+          ? [{ assetType: "", scopes: sortScopesNewestFirst(visible) }]
+          : []
+        : groupByAssetType(visible),
+    [order, visible],
+  );
   const changed = scopes.filter((scope) => scope.changedSinceLastSync).length;
 
   return (
@@ -205,6 +247,13 @@ export function ScopePanel({ scopes }: { scopes: ScopeRow[] }) {
           <Badge className="border-accent/50 text-link">{changed} new since last sync</Badge>
         ) : null}
         <div className="ml-auto flex gap-2">
+          <Select
+            aria-label="Order assets"
+            value={order}
+            onValueChange={setOrder}
+            options={ORDER_OPTIONS}
+            className="w-36"
+          />
           <ExportMenu visible={visible} matching={matching} />
         </div>
       </div>
@@ -226,11 +275,16 @@ export function ScopePanel({ scopes }: { scopes: ScopeRow[] }) {
         </div>
       )}
       {groups.map((group) => (
-        <section key={group.assetType} aria-label={assetTypeLabel(group.assetType)}>
-          <h3 className="sticky top-0 z-[1] flex items-center gap-2 border-b border-line bg-surface px-5 py-1.5 text-[12px] font-medium text-muted">
-            {assetTypeLabel(group.assetType)}
-            <span className="font-mono text-faint">{group.scopes.length}</span>
-          </h3>
+        <section
+          key={group.assetType || "all"}
+          aria-label={group.assetType ? assetTypeLabel(group.assetType) : "Assets, newest first"}
+        >
+          {group.assetType ? (
+            <h3 className="sticky top-0 z-[1] flex items-center gap-2 border-b border-line bg-surface px-5 py-1.5 text-[12px] font-medium text-muted">
+              {assetTypeLabel(group.assetType)}
+              <span className="font-mono text-faint">{group.scopes.length}</span>
+            </h3>
+          ) : null}
           <ul>
             {group.scopes.map((scope) => (
               <li
@@ -252,6 +306,7 @@ export function ScopePanel({ scopes }: { scopes: ScopeRow[] }) {
                       {scope.instruction}
                     </p>
                   ) : null}
+                  <AssetMeta scope={scope} showType={!group.assetType} />
                 </div>
                 <Flag on={scope.eligibleForSubmission} yes="In scope" no="Out of scope" />
                 <Flag on={scope.eligibleForBounty} yes="Bounty" no="No bounty" />

@@ -27,6 +27,7 @@ import { columnHelper } from "@/lib/table";
 import { sortStateSchema, viewModeSchema, type SortState } from "@/lib/view-state";
 import { useViewAction } from "@/features/shell/view-actions";
 import { queryKeys } from "@/query/keys";
+import { ProgramLabelById } from "@/features/programs/program-label";
 import { IntentTracker } from "./intent-tracker";
 
 const PHASES: IntentPhase[] = ["analyzing", "needsInput", "ready", "submitted", "failed"];
@@ -90,6 +91,12 @@ const columns = helper.columns([
     size: 380,
     cell: (info) => <span className="text-ink">{info.getValue()}</span>,
   }),
+  helper.accessor((row) => row.programId ?? "", {
+    id: "program",
+    header: "Program",
+    size: 200,
+    cell: (info) => <ProgramLabelById id={info.getValue() || null} />,
+  }),
   helper.accessor("phase", {
     header: "Status",
     size: 130,
@@ -119,15 +126,16 @@ function IntentCard({ intent, onOpen }: { intent: ReportIntent; onOpen: () => vo
   return (
     <button type="button" onClick={onOpen} className={cardClass}>
       <div className="flex w-full items-center justify-between gap-3 text-[13px]">
-        <PhaseLabel phase={intent.phase} />
-        <span className="font-mono text-[12px] text-faint">#{intent.id}</span>
+        <ProgramLabelById id={intent.programId} />
+        <span className="shrink-0 font-mono text-[12px] text-faint">#{intent.id}</span>
       </div>
       <p className="line-clamp-2 min-h-10 text-[14px] leading-5 font-medium text-ink">{titleOf(intent)}</p>
       <p className="w-full truncate font-mono text-[12px] text-faint">
         {intent.metadata.vulnerableUrl ?? intent.metadata.bugClass ?? "No analysis yet"}
       </p>
-      <div className="mt-auto flex w-full items-center justify-between border-t border-line pt-3 text-[12px] text-faint">
-        <span className="inline-flex items-center gap-1">
+      <div className="mt-auto flex w-full items-center justify-between gap-3 border-t border-line pt-3 text-[12px] text-faint">
+        <PhaseLabel phase={intent.phase} />
+        <span className="ml-auto inline-flex items-center gap-1">
           <Paperclip className="size-3" />
           {intent.attachments.length}
         </span>

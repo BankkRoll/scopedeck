@@ -20,7 +20,9 @@ test("onboarding rejects bad credentials, then connects with a valid token", asy
 
 test("browses a program, its scope, exclusions and sanitized policy", async ({ signedIn: page }) => {
   await page.getByRole("region", { name: "Programs" }).getByText("Acme Corp").click();
-  await expect(page.getByRole("heading", { name: "Acme Corp" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Acme Corp", exact: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Policy", selected: true })).toBeVisible();
+  await page.getByRole("tab", { name: /Scope/ }).click();
   await expect(page.getByText("api.acme.com")).toBeVisible();
   await expect(page.getByText("legacy.acme.com")).toBeHidden();
   await expect(page.getByText("New", { exact: true })).toBeVisible();
@@ -193,5 +195,5 @@ test("opens the command palette and jumps to a program", async ({ signedIn: page
   await page.keyboard.press("Control+K");
   await page.getByPlaceholder("Jump to a program, asset, report or action").fill("glob");
   await page.getByRole("option", { name: /Globex/ }).click();
-  await expect(page.getByRole("heading", { name: "Globex" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Globex", exact: true })).toBeVisible();
 });

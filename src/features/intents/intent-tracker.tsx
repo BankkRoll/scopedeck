@@ -24,6 +24,7 @@ import { Field, Textarea } from "@/components/ui/field";
 import { formatBytes, humanize } from "@/domain/format";
 import { cn } from "@/lib/cn";
 import { queryKeys } from "@/query/keys";
+import { ProgramLabelById } from "@/features/programs/program-label";
 
 const STEPS: { phase: IntentPhase; label: string }[] = [
   { phase: "analyzing", label: "Analyzing" },
@@ -156,6 +157,19 @@ export function IntentTracker({ intentId, onSubmitted, onDeleted }: IntentTracke
         {data.phase === "failed" &&
           "One or more analysis jobs failed. Update the description to retry, or delete the intent."}
       </p>
+
+      {data.hasCanceledJobs ? (
+        <p className="rounded-md border border-warning/40 bg-warning/5 px-3 py-2 text-[13px] text-ink">
+          HackerOne cancelled part of the analysis, usually because the description changed while it ran. It
+          restarts on its own the next time you edit the description.
+        </p>
+      ) : null}
+
+      {data.programId ? (
+        <div className="text-[13px]">
+          <ProgramLabelById id={data.programId} />
+        </div>
+      ) : null}
 
       {data.title ? (
         <div>

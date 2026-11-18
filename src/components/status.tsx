@@ -1,4 +1,5 @@
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { AlertTriangle, ArrowLeft, ChevronRight, RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 import { describeError, type AppError } from "@/ipc/errors";
 import { formatDateTime, formatRelative, humanize } from "@/domain/format";
@@ -87,20 +88,48 @@ export function SeverityLabel({ rating }: { rating: string | null | undefined })
   );
 }
 
+/** The list page a detail page belongs to, shown as a back arrow and the breadcrumb root. */
+export interface PageParent {
+  to: "/programs" | "/reports" | "/intents" | "/hacktivity" | "/earnings";
+  label: string;
+}
+
 export function PageHeader({
   title,
   meta,
   actions,
+  parent,
 }: {
   title: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
+  parent?: PageParent;
 }) {
   return (
     <header className="flex min-h-14 shrink-0 items-center justify-between gap-4 border-b border-line px-5">
-      <div className="flex min-w-0 items-baseline gap-3">
-        <h1 className="truncate text-[15px] font-semibold tracking-tight">{title}</h1>
-        {meta ? <div className="truncate text-faint">{meta}</div> : null}
+      <div className="flex min-w-0 items-center gap-2">
+        {parent ? (
+          <>
+            <Link
+              to={parent.to}
+              aria-label={`Back to ${parent.label}`}
+              title={`Back to ${parent.label}`}
+              className="-ml-1.5 grid size-7 shrink-0 place-items-center rounded-md text-muted transition-colors hover:bg-hover hover:text-ink"
+            >
+              <ArrowLeft className="size-4" />
+            </Link>
+            <nav aria-label="Breadcrumb" className="flex shrink-0 items-center gap-1 text-[13px]">
+              <Link to={parent.to} className="text-faint transition-colors hover:text-ink">
+                {parent.label}
+              </Link>
+              <ChevronRight className="size-3.5 text-faint" aria-hidden />
+            </nav>
+          </>
+        ) : null}
+        <div className="flex min-w-0 items-baseline gap-3">
+          <h1 className="truncate text-[15px] font-semibold tracking-tight">{title}</h1>
+          {meta ? <div className="truncate text-faint">{meta}</div> : null}
+        </div>
       </div>
       {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
     </header>

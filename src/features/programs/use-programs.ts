@@ -88,3 +88,12 @@ export function useProgramLookup(): ReadonlyMap<string, ProgramRow> {
     [cached.data],
   );
 }
+
+/**
+ * Programs by API id, from the local cache only. Report intents reference their program by id,
+ * not by handle.
+ */
+export function useProgramLookupById(): ReadonlyMap<string, ProgramRow> {
+  const byHandle = useProgramLookup();
+  return useMemo(() => new Map([...byHandle.values()].map((row) => [row.id, row] as const)), [byHandle]);
+}
