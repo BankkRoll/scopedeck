@@ -15,7 +15,9 @@ earnings, and search Hacktivity, all from one window.
 - **Programs.** Full-text search across every program and asset you can access, pinned
   programs, and a "new" badge on scope that changed since your last sync. Export scope for your
   tools: hosts, wildcards, URLs, CIDR ranges, a Burp Suite scope file or a Nuclei target list.
-  Private, local-only notes per program.
+  Each program page opens on its policy and has tabs for scope (with added dates and CIA
+  requirements), exclusions, weaknesses, your reports there, its disclosed Hacktivity, and private,
+  local-only notes.
 - **Composer.** A guided flow from target to submission: a step rail that shows what is left, a
   draft quality score with concrete hints, a CVSS 3.1 calculator that sets the severity and
   records the vector, and per-weakness starter templates. Write in a split Markdown editor with
@@ -31,8 +33,9 @@ earnings, and search Hacktivity, all from one window.
 - **Report intents.** For programs that support them, submit through an intent and watch it
   move from pending to ready.
 - **Reports.** An inbox with cards, a list or a board by state, a "needs your attention" filter
-  for reports waiting on you, the full activity timeline, and opt-in desktop notifications.
-- **Hacktivity.** A query builder that compiles to the API's Lucene syntax, a raw query mode,
+  for reports waiting on you, the full activity timeline, response and triage times, the CVSS
+  vector, top-paid disclosures for the same weakness, and opt-in desktop notifications.
+- **Hacktivity.** Report summaries and time to disclosure in a details panel, a query builder that compiles to the API's Lucene syntax, a raw query mode,
   saved searches and infinite scroll.
 - **Earnings.** Balance, year to date against last year, average and largest bounty, monthly
   totals, breakdowns by program and type, and CSV export.
@@ -86,6 +89,12 @@ Download the installer for your platform from the
 
 Releases are signed. **Settings → Check for updates** fetches the release manifest, and an
 update installs only when you confirm it and its signature verifies.
+
+On Windows, Setup installs for your account only, so it needs no administrator rights. Running it
+again updates or reinstalls in place and keeps your sign-in, drafts and settings; an MSI install
+from 0.1.2 or earlier is removed and replaced. To uninstall, use **Settings → Apps**. Your data is
+kept unless you tick **Also remove my data**, which also deletes the API token and AI key from
+Windows Credential Manager. Scripted installs can use `/S` (silent) and `/P` (passive).
 
 ### Connect your account
 

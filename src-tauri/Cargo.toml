@@ -1,6 +1,6 @@
 [package]
 name = "scopedeck"
-version = "0.1.2"
+version = "0.1.3"
 description = "Local-first desktop client for the HackerOne Hacker API"
 authors = ["Scopedeck contributors"]
 license = "MIT"

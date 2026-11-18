@@ -91,6 +91,7 @@ await page
 await page.getByText("Northwind Traders").first().waitFor();
 
 await go(page, "#/programs/acme");
+await page.getByRole("tab", { name: /Scope/ }).click();
 await page.getByText("api.acme.com").waitFor();
 await settle(page);
 await page.screenshot({ path: `${out}/program.png` });
